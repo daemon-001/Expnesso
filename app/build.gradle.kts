@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.google.services)
 }
 
 android {
@@ -46,6 +47,29 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
+    
+    // Firebase
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.auth)
+
+    implementation(libs.firebase.firestore)
+    implementation(libs.firebase.analytics)
+    
+    // Google Sign In
+    implementation(libs.play.services.auth)
+    
+    // Navigation Compose
+    implementation(libs.androidx.navigation.compose)
+    
+    // Animations (Lottie)
+    implementation(libs.lottie.compose)
+    
+    // Vico Charts
+    implementation(libs.vico.compose)
+    implementation(libs.vico.compose.m3)
+    
+    // Coroutines
+    implementation(libs.kotlinx.coroutines.android)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
