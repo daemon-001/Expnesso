@@ -1,14 +1,28 @@
 package com.daemon.expnesso.ui.dashboard
 
+import android.graphics.Bitmap
+import android.widget.Toast
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -16,62 +30,168 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import coil.compose.AsyncImage
 import com.daemon.expnesso.data.model.Transaction
+import com.daemon.expnesso.data.model.User
 import com.daemon.expnesso.data.repository.AuthRepository
 import com.daemon.expnesso.data.repository.FirestoreRepository
-import com.daemon.expnesso.ui.theme.PrimaryAccent
-import com.daemon.expnesso.ui.theme.PremiumBackground
-import com.daemon.expnesso.ui.theme.PremiumSurface
-import com.daemon.expnesso.ui.theme.PremiumSurfaceVariant
-import com.daemon.expnesso.ui.theme.ErrorRed
+import com.daemon.expnesso.ui.theme.*
+import com.daemon.expnesso.utils.QRCodeUtils
+import com.google.mlkit.vision.barcode.common.Barcode
+import com.google.mlkit.vision.codescanner.GmsBarcodeScannerOptions
+import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
 import java.text.SimpleDateFormat
-import java.util.Date
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DashboardScreen(navController: NavController, sessionId: String) {
+fun DashboardScreen(navController: NavController, initialSessionId: String) {
     val context = LocalContext.current
     val authRepository = remember { AuthRepository(context) }
     val firestoreRepository = remember { FirestoreRepository() }
-    val viewModel = remember { DashboardViewModel(authRepository, firestoreRepository, sessionId) }
+    val viewModel = remember { DashboardViewModel(authRepository, firestoreRepository, initialSessionId) }
 
     val transactions by viewModel.transactions.collectAsState()
     val totalSpent by viewModel.totalSpent.collectAsState()
     val session by viewModel.session.collectAsState()
-    
-    var showAddDialog by remember { mutableStateOf(false) }
+    val allSessions by viewModel.allSessions.collectAsState()
+    val sessionMembers by viewModel.sessionMembers.collectAsState()
+    val netBalances by viewModel.netBalances.collectAsState()
+
+    // Dialog States
+    var showAddExpenseDialog by remember { mutableStateOf(false) }
+    var showDropdown by remember { mutableStateOf(false) }
+    var fabExpanded by remember { mutableStateOf(false) }
+    var showInviteDialog by remember { mutableStateOf(false) }
+    var showCreateBookDialog by remember { mutableStateOf(false) }
+    var showJoinBookDialog by remember { mutableStateOf(false) }
+
+    val scannerOptions = remember {
+        GmsBarcodeScannerOptions.Builder()
+            .setBarcodeFormats(Barcode.FORMAT_QR_CODE)
+            .enableAutoZoom()
+            .build()
+    }
+    val scanner = remember { GmsBarcodeScanning.getClient(context, scannerOptions) }
 
     Scaffold(
         containerColor = PremiumBackground,
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = { showAddDialog = true },
-                containerColor = PrimaryAccent,
-                contentColor = Color.Black
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "Add Expense")
+            Column(horizontalAlignment = Alignment.End) {
+                AnimatedVisibility(
+                    visible = fabExpanded,
+                    enter = fadeIn(),
+                    exit = fadeOut()
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.End,
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Join Book", color = Color.White, fontWeight = FontWeight.Medium)
+                            Spacer(modifier = Modifier.width(12.dp))
+                            SmallFloatingActionButton(
+                                onClick = {
+                                    fabExpanded = false
+                                    showJoinBookDialog = true
+                                },
+                                containerColor = PremiumSurfaceVariant,
+                                contentColor = Color.White
+                            ) {
+                                Icon(Icons.Default.Search, contentDescription = "Join Book")
+                            }
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Create Book", color = Color.White, fontWeight = FontWeight.Medium)
+                            Spacer(modifier = Modifier.width(12.dp))
+                            SmallFloatingActionButton(
+                                onClick = {
+                                    fabExpanded = false
+                                    showCreateBookDialog = true
+                                },
+                                containerColor = PremiumSurfaceVariant,
+                                contentColor = Color.White
+                            ) {
+                                Icon(Icons.Default.Person, contentDescription = "Create Book")
+                            }
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Add Expense", color = Color.White, fontWeight = FontWeight.Medium)
+                            Spacer(modifier = Modifier.width(12.dp))
+                            SmallFloatingActionButton(
+                                onClick = {
+                                    fabExpanded = false
+                                    showAddExpenseDialog = true
+                                },
+                                containerColor = PrimaryAccent,
+                                contentColor = Color.Black
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = "Add Expense")
+                            }
+                        }
+                    }
+                }
+                FloatingActionButton(
+                    onClick = { fabExpanded = !fabExpanded },
+                    containerColor = if (fabExpanded) PremiumSurfaceVariant else PrimaryAccent,
+                    contentColor = if (fabExpanded) Color.White else Color.Black
+                ) {
+                    Icon(if (fabExpanded) Icons.Default.Close else Icons.Default.Add, contentDescription = "Toggle Actions")
+                }
             }
         },
         topBar = {
             TopAppBar(
-                title = { 
-                    Column {
-                        Text(session?.name ?: "Book", fontWeight = FontWeight.Bold, color = Color.White)
-                        if (session != null) {
-                            Text("Code: ${session?.inviteCode}", fontSize = 12.sp, color = PrimaryAccent)
+                title = {
+                    Box(modifier = Modifier.wrapContentSize(Alignment.TopStart)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .clickable { showDropdown = true }
+                                .padding(8.dp)
+                        ) {
+                            Text(
+                                text = session?.name ?: "Loading...",
+                                fontWeight = FontWeight.Bold,
+                                color = TextPrimary,
+                                fontSize = 20.sp
+                            )
+                            Icon(Icons.Default.ArrowDropDown, contentDescription = "Switch Book", tint = TextPrimary)
+                        }
+                        DropdownMenu(
+                            expanded = showDropdown,
+                            onDismissRequest = { showDropdown = false },
+                            modifier = Modifier.background(PremiumSurface)
+                        ) {
+                            allSessions.forEach { s ->
+                                DropdownMenuItem(
+                                    text = { Text(s.name, color = TextPrimary) },
+                                    onClick = {
+                                        viewModel.switchSession(s.id)
+                                        showDropdown = false
+                                    }
+                                )
+                            }
                         }
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = PremiumBackground
-                )
+                actions = {
+                    IconButton(onClick = { showInviteDialog = true }) {
+                        Icon(Icons.Default.Share, contentDescription = "Invite", tint = TextPrimary)
+                    }
+                    IconButton(onClick = { session?.let { viewModel.setAsDefaultSession(it.id) } }) {
+                        Icon(Icons.Default.Star, contentDescription = "Set Default", tint = SecondaryAccent)
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = PremiumBackground)
             )
         }
     ) { padding ->
@@ -81,90 +201,314 @@ fun DashboardScreen(navController: NavController, sessionId: String) {
                 .fillMaxSize()
                 .padding(horizontal = 16.dp)
         ) {
+            val myCredits by viewModel.myCredits.collectAsState()
+            val myDebts by viewModel.myDebts.collectAsState()
+            val currentUser = sessionMembers[viewModel.currentUserId]
+            val myBalance = netBalances[viewModel.currentUserId] ?: 0.0
+
+            val totalWillGet = myCredits.sumOf { it.amount }
+            val totalWillPay = myDebts.sumOf { it.amount }
+
             // Premium Summary Card
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(24.dp))
-                    .background(
-                        Brush.linearGradient(
-                            colors = listOf(PremiumSurfaceVariant, PremiumSurface)
-                        )
-                    )
+                    .background(Brush.linearGradient(colors = listOf(PremiumSurfaceVariant, PremiumSurface)))
                     .padding(24.dp)
             ) {
-                Column {
-                    Text("Total Spent", color = Color.LightGray, fontSize = 14.sp)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "$${String.format("%.2f", totalSpent)}",
-                        fontSize = 40.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    AsyncImage(
+                        model = currentUser?.photoUrl?.ifEmpty { "https://ui-avatars.com/api/?name=${currentUser?.name}" } ?: "https://ui-avatars.com/api/?name=?",
+                        contentDescription = "My Avatar",
+                        modifier = Modifier
+                            .size(72.dp)
+                            .clip(CircleShape)
+                            .background(PremiumSurfaceVariant),
+                        contentScale = ContentScale.Crop
                     )
+                    Spacer(modifier = Modifier.width(24.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Total Bal: $${String.format("%.2f", myBalance)}",
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Column {
+                                Text("will get", color = TextSecondary, fontSize = 14.sp)
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text("$${String.format("%.2f", totalWillGet)}", color = SuccessGreen, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                            }
+                            Column(horizontalAlignment = Alignment.End) {
+                                Text("will pay", color = TextSecondary, fontSize = 14.sp)
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text("$${String.format("%.2f", totalWillPay)}", color = ErrorRed, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
                 }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
-            
-            Text("Recent Transactions", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+
+            val membersList = sessionMembers.values.toList()
+            if (membersList.size > 1) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    // Left Column (Credits / Owes You)
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Credit", color = SuccessGreen, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                        HorizontalDivider(color = SuccessGreen, modifier = Modifier.padding(vertical = 8.dp))
+                        if (myCredits.isEmpty()) {
+                            Text("No credits", color = TextSecondary, fontSize = 14.sp)
+                        } else {
+                            myCredits.forEach { debt ->
+                                val debtor = sessionMembers[debt.fromUid]
+                                val firstName = debtor?.name?.split(" ")?.firstOrNull() ?: "Unknown"
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    AsyncImage(
+                                        model = debtor?.photoUrl?.ifEmpty { "https://ui-avatars.com/api/?name=$firstName" } ?: "https://ui-avatars.com/api/?name=?",
+                                        contentDescription = "Avatar",
+                                        modifier = Modifier
+                                            .size(32.dp)
+                                            .clip(CircleShape)
+                                            .background(PremiumSurfaceVariant),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Column {
+                                        Text(firstName, color = TextPrimary, fontSize = 14.sp)
+                                        Text("+$${String.format("%.2f", debt.amount)}", color = SuccessGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(12.dp))
+                            }
+                        }
+                    }
+                    
+                    // Right Column (Debts / You Owe)
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Debt", color = ErrorRed, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                        HorizontalDivider(color = ErrorRed, modifier = Modifier.padding(vertical = 8.dp))
+                        if (myDebts.isEmpty()) {
+                            Text("No debts", color = TextSecondary, fontSize = 14.sp)
+                        } else {
+                            myDebts.forEach { debt ->
+                                val creditor = sessionMembers[debt.toUid]
+                                val firstName = creditor?.name?.split(" ")?.firstOrNull() ?: "Unknown"
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    AsyncImage(
+                                        model = creditor?.photoUrl?.ifEmpty { "https://ui-avatars.com/api/?name=$firstName" } ?: "https://ui-avatars.com/api/?name=?",
+                                        contentDescription = "Avatar",
+                                        modifier = Modifier
+                                            .size(32.dp)
+                                            .clip(CircleShape)
+                                            .background(PremiumSurfaceVariant),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Column {
+                                        Text(firstName, color = TextPrimary, fontSize = 14.sp)
+                                        Text("-$${String.format("%.2f", debt.amount)}", color = ErrorRed, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(12.dp))
+                            }
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(24.dp))
+            }
+
+            Text("Transactions", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
             Spacer(modifier = Modifier.height(16.dp))
 
             LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.weight(1f)
             ) {
                 items(transactions) { tx ->
-                    TransactionItem(
-                        transaction = tx,
-                        currentUserId = viewModel.currentUserId,
-                        adminUid = session?.adminUid,
-                        onDelete = {
-                            viewModel.deleteTransaction(tx.id, session?.adminUid ?: "", tx.addedByUid)
-                        }
-                    )
+                    AnimatedVisibility(
+                        visible = true,
+                        enter = fadeIn(animationSpec = tween(500)),
+                        exit = fadeOut(animationSpec = tween(500))
+                    ) {
+                        TransactionItem(
+                            transaction = tx,
+                            paidBy = sessionMembers[tx.paidByUid.ifEmpty { tx.addedByUid }],
+                            currentUserId = viewModel.currentUserId,
+                            adminUid = session?.adminUid,
+                            onDelete = {
+                                viewModel.deleteTransaction(tx.id, session?.adminUid ?: "", tx.addedByUid)
+                            }
+                        )
+                    }
                 }
             }
         }
     }
 
-    if (showAddDialog) {
-        var amount by remember { mutableStateOf("") }
-        var description by remember { mutableStateOf("") }
+    if (showAddExpenseDialog) {
+        val isGroup = sessionMembers.size > 1
+        AddTransactionDialog(
+            sessionMembers = sessionMembers.values.toList(),
+            currentUserId = viewModel.currentUserId,
+            isGroup = isGroup,
+            onDismiss = { showAddExpenseDialog = false },
+            onAdd = { amount, desc, paidByUid, splits ->
+                viewModel.addTransaction(amount, desc, paidByUid, splits) {
+                    showAddExpenseDialog = false
+                }
+            }
+        )
+    }
+
+    if (showInviteDialog && session != null) {
         AlertDialog(
-            onDismissRequest = { showAddDialog = false },
-            title = { Text("Add Expense") },
+            onDismissRequest = { showInviteDialog = false },
+            title = { Text("Invite to ${session!!.name}", color = TextPrimary) },
+            text = {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                    Text("Share this code or scan the QR below:", color = TextSecondary)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = session!!.inviteCode,
+                        fontSize = 32.sp,
+                        fontWeight = FontWeight.Black,
+                        color = PrimaryAccent,
+                        letterSpacing = 4.sp
+                    )
+                    Spacer(modifier = Modifier.height(24.dp))
+                    val qrBitmap = remember(session!!.inviteCode) {
+                        QRCodeUtils.generateQRCode(session!!.inviteCode)
+                    }
+                    if (qrBitmap != null) {
+                        Image(
+                            bitmap = qrBitmap.asImageBitmap(),
+                            contentDescription = "QR Code",
+                            modifier = Modifier
+                                .size(200.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(Color.White)
+                                .padding(8.dp)
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(onClick = { showInviteDialog = false }, colors = ButtonDefaults.buttonColors(containerColor = PrimaryAccent)) {
+                    Text("Close", color = Color.Black)
+                }
+            },
+            containerColor = PremiumSurface
+        )
+    }
+
+    if (showCreateBookDialog) {
+        var bookName by remember { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { showCreateBookDialog = false },
+            title = { Text("Create New Book", color = TextPrimary) },
+            text = {
+                OutlinedTextField(
+                    value = bookName,
+                    onValueChange = { bookName = it },
+                    label = { Text("Book Name", color = TextSecondary) },
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary)
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.createSession(bookName) {
+                            showCreateBookDialog = false
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryAccent)
+                ) {
+                    Text("Create", color = Color.Black)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCreateBookDialog = false }) { Text("Cancel", color = TextSecondary) }
+            },
+            containerColor = PremiumSurface
+        )
+    }
+
+    if (showJoinBookDialog) {
+        var inviteCode by remember { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { showJoinBookDialog = false },
+            title = { Text("Join Book", color = TextPrimary) },
             text = {
                 Column {
-                    OutlinedTextField(
-                        value = amount,
-                        onValueChange = { amount = it },
-                        label = { Text("Amount") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        singleLine = true
-                    )
+                    Button(
+                        onClick = {
+                            showJoinBookDialog = false
+                            scanner.startScan()
+                                .addOnSuccessListener { barcode ->
+                                    val rawValue = barcode.rawValue
+                                    if (!rawValue.isNullOrBlank()) {
+                                        viewModel.joinSession(
+                                            inviteCode = rawValue,
+                                            onSuccess = { Toast.makeText(context, "Joined successfully!", Toast.LENGTH_SHORT).show() },
+                                            onError = { err -> Toast.makeText(context, err, Toast.LENGTH_LONG).show() }
+                                        )
+                                    }
+                                }
+                                .addOnFailureListener {
+                                    Toast.makeText(context, "Scan failed: ${it.message}", Toast.LENGTH_LONG).show()
+                                }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = SecondaryAccent),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.Search, contentDescription = "Scan", tint = Color.White)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Scan QR Code", color = Color.White)
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("Or enter code manually:", color = TextSecondary)
                     Spacer(modifier = Modifier.height(8.dp))
+
                     OutlinedTextField(
-                        value = description,
-                        onValueChange = { description = it },
-                        label = { Text("Description") },
-                        singleLine = true
+                        value = inviteCode,
+                        onValueChange = { inviteCode = it.uppercase() },
+                        label = { Text("Invite Code", color = TextSecondary) },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary)
                     )
                 }
             },
             confirmButton = {
-                Button(onClick = {
-                    val amt = amount.toDoubleOrNull()
-                    if (amt != null && description.isNotBlank()) {
-                        viewModel.addTransaction(amt, description) {
-                            showAddDialog = false
+                Button(
+                    onClick = {
+                        if (inviteCode.length == 6) {
+                            viewModel.joinSession(
+                                inviteCode = inviteCode,
+                                onSuccess = {
+                                    Toast.makeText(context, "Joined successfully!", Toast.LENGTH_SHORT).show()
+                                    showJoinBookDialog = false
+                                },
+                                onError = { err ->
+                                    Toast.makeText(context, err, Toast.LENGTH_LONG).show()
+                                }
+                            )
                         }
-                    }
-                }) {
-                    Text("Add")
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryAccent),
+                    enabled = inviteCode.length == 6
+                ) {
+                    Text("Join", color = Color.Black)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showAddDialog = false }) { Text("Cancel") }
+                TextButton(onClick = { showJoinBookDialog = false }) { Text("Cancel", color = TextSecondary) }
             },
             containerColor = PremiumSurface
         )
@@ -174,12 +518,13 @@ fun DashboardScreen(navController: NavController, sessionId: String) {
 @Composable
 fun TransactionItem(
     transaction: Transaction,
+    paidBy: User?,
     currentUserId: String?,
     adminUid: String?,
     onDelete: () -> Unit
 ) {
     val canDelete = currentUserId == adminUid || currentUserId == transaction.addedByUid
-    
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = PremiumSurface),
@@ -191,20 +536,20 @@ fun TransactionItem(
                 .fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
+            AsyncImage(
+                model = paidBy?.photoUrl?.ifEmpty { "https://ui-avatars.com/api/?name=${paidBy.name}" } ?: "https://ui-avatars.com/api/?name=?",
+                contentDescription = "Avatar",
                 modifier = Modifier
                     .size(48.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color(0xFF334155)),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("$", color = PrimaryAccent, fontSize = 24.sp, fontWeight = FontWeight.Bold)
-            }
+                    .clip(CircleShape)
+                    .background(PremiumSurfaceVariant),
+                contentScale = ContentScale.Crop
+            )
             Spacer(modifier = Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(transaction.description, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Medium)
                 val sdf = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault())
-                Text(sdf.format(transaction.timestamp.toDate()), color = Color.Gray, fontSize = 12.sp)
+                Text("${sdf.format(transaction.timestamp.toDate())} • Paid by ${paidBy?.name ?: "Unknown"}", color = TextSecondary, fontSize = 12.sp)
             }
             Text(
                 text = "$${String.format("%.2f", transaction.amount)}",
@@ -212,7 +557,7 @@ fun TransactionItem(
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold
             )
-            
+
             if (canDelete) {
                 IconButton(onClick = onDelete) {
                     Icon(Icons.Default.Delete, contentDescription = "Delete", tint = ErrorRed)

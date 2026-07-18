@@ -10,19 +10,43 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import java.util.UUID
-
 class FirestoreRepository {
     private val db = FirebaseFirestore.getInstance()
 
     suspend fun saveUser(firebaseUser: FirebaseUser) {
-        val user = User(
-            uid = firebaseUser.uid,
-            email = firebaseUser.email ?: "",
-            name = firebaseUser.displayName ?: "",
-            photoUrl = firebaseUser.photoUrl?.toString() ?: ""
-        )
-        db.collection("users").document(user.uid).set(user).await()
+        val userRef = db.collection("users").document(firebaseUser.uid)
+        val snapshot = userRef.get().await()
+        if (!snapshot.exists()) {
+            val user = User(
+                uid = firebaseUser.uid,
+                email = firebaseUser.email ?: "",
+                name = firebaseUser.displayName ?: "",
+                photoUrl = firebaseUser.photoUrl?.toString() ?: ""
+            )
+            userRef.set(user).await()
+        }
+    }
+
+    suspend fun getUser(uid: String): User? {
+        return db.collection("users").document(uid).get().await().toObject(User::class.java)
+    }
+    
+    suspend fun getUsers(uids: List<String>): List<User> {
+        if (uids.isEmpty()) return emptyList()
+        // Firestore 'in' queries are limited to 10 elements. For simplicity in MVP, we just chunk it or do individual gets.
+        // Actually, fetching individual documents in parallel is very fast.
+        return coroutineScope {
+            uids.map { uid ->
+                async { getUser(uid) }
+            }.mapNotNull { it.await() }
+        }
+    }
+
+    suspend fun setDefaultSession(uid: String, sessionId: String) {
+        db.collection("users").document(uid).update("defaultSessionId", sessionId).await()
     }
 
     suspend fun createSession(name: String, adminUid: String): String {

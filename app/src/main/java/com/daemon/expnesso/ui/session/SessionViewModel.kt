@@ -19,7 +19,7 @@ class SessionViewModel(
 
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading
-    
+
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error
 
@@ -28,47 +28,50 @@ class SessionViewModel(
     }
 
     private fun loadSessions() {
-        val user = authRepository.currentUser
-        if (user != null) {
-            viewModelScope.launch {
-                firestoreRepository.getUserSessions(user.uid).collect { sessionList ->
-                    _sessions.value = sessionList
+        val uid = authRepository.currentUser?.uid ?: return
+        viewModelScope.launch {
+            _isLoading.value = true
+            try {
+                firestoreRepository.getUserSessions(uid).collect { userSessions ->
+                    _sessions.value = userSessions
+                    _isLoading.value = false
                 }
+            } catch (e: Exception) {
+                _error.value = e.message
+                _isLoading.value = false
             }
         }
     }
 
     fun createSession(name: String, onSuccess: (String) -> Unit) {
-        val user = authRepository.currentUser ?: return
+        val uid = authRepository.currentUser?.uid ?: return
         viewModelScope.launch {
             _isLoading.value = true
-            _error.value = null
             try {
-                val sessionId = firestoreRepository.createSession(name, user.uid)
+                val sessionId = firestoreRepository.createSession(name, uid)
+                _isLoading.value = false
                 onSuccess(sessionId)
             } catch (e: Exception) {
-                _error.value = e.localizedMessage
-            } finally {
+                _error.value = e.message
                 _isLoading.value = false
             }
         }
     }
 
     fun joinSession(inviteCode: String, onSuccess: (String) -> Unit) {
-        val user = authRepository.currentUser ?: return
+        val uid = authRepository.currentUser?.uid ?: return
         viewModelScope.launch {
             _isLoading.value = true
-            _error.value = null
             try {
-                val sessionId = firestoreRepository.joinSession(inviteCode, user.uid)
+                val sessionId = firestoreRepository.joinSession(inviteCode, uid)
+                _isLoading.value = false
                 if (sessionId != null) {
                     onSuccess(sessionId)
                 } else {
                     _error.value = "Invalid invite code"
                 }
             } catch (e: Exception) {
-                _error.value = e.localizedMessage
-            } finally {
+                _error.value = e.message
                 _isLoading.value = false
             }
         }

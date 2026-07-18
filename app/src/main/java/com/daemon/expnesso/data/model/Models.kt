@@ -6,7 +6,8 @@ data class User(
     val uid: String = "",
     val email: String = "",
     val name: String = "",
-    val photoUrl: String = ""
+    val photoUrl: String = "",
+    val defaultSessionId: String? = null
 )
 
 data class Session(
@@ -24,5 +25,7 @@ data class Transaction(
     val amount: Double = 0.0,
     val description: String = "",
     val addedByUid: String = "",
+    val paidByUid: String = "",
+    val splits: Map<String, Double> = emptyMap(),
     val timestamp: Timestamp = Timestamp.now()
 )

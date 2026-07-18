@@ -40,8 +40,19 @@ fun LoginScreen(navController: NavController) {
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
-        if (authRepository.currentUser != null) {
-            navController.navigate(Screen.SessionManagement.route) {
+        val currentUser = authRepository.currentUser
+        if (currentUser != null) {
+            val firestoreRepository = com.daemon.expnesso.data.repository.FirestoreRepository()
+            // Make sure the user document exists!
+            firestoreRepository.saveUser(currentUser)
+            
+            val userDoc = firestoreRepository.getUser(currentUser.uid)
+            var targetSessionId = userDoc?.defaultSessionId
+            if (targetSessionId.isNullOrEmpty()) {
+                targetSessionId = firestoreRepository.createSession("Personal Expenses", currentUser.uid)
+                firestoreRepository.setDefaultSession(currentUser.uid, targetSessionId)
+            }
+            navController.navigate(Screen.Dashboard.createRoute(targetSessionId)) {
                 popUpTo(Screen.Login.route) { inclusive = true }
             }
         }
@@ -58,9 +69,21 @@ fun LoginScreen(navController: NavController) {
                 scope.launch {
                     try {
                         isLoading = true
-                        authRepository.firebaseAuth.signInWithCredential(credential).await()
-                        navController.navigate(Screen.SessionManagement.route) {
-                            popUpTo(Screen.Login.route) { inclusive = true }
+                        val authResult = authRepository.firebaseAuth.signInWithCredential(credential).await()
+                        authResult.user?.let { firebaseUser ->
+                            val firestoreRepository = com.daemon.expnesso.data.repository.FirestoreRepository()
+                            firestoreRepository.saveUser(firebaseUser)
+                            val userDoc = firestoreRepository.getUser(firebaseUser.uid)
+                            var targetSessionId = userDoc?.defaultSessionId
+                            if (targetSessionId.isNullOrEmpty()) {
+                                targetSessionId = firestoreRepository.createSession("Personal Expenses", firebaseUser.uid)
+                                firestoreRepository.setDefaultSession(firebaseUser.uid, targetSessionId)
+                            }
+                            navController.navigate(Screen.Dashboard.createRoute(targetSessionId)) {
+                                popUpTo(Screen.Login.route) { inclusive = true }
+                            }
+                        } ?: run {
+                            throw Exception("Failed to get Firebase User")
                         }
                     } catch (e: Exception) {
                         errorMessage = e.localizedMessage
