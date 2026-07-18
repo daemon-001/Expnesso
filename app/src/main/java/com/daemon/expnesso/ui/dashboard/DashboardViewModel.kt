@@ -274,6 +274,24 @@ class DashboardViewModel(
         }
     }
 
+    fun addManualMember(name: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
+        if (name.isBlank()) {
+            onError("Name cannot be empty")
+            return
+        }
+        val currentSession = _currentSessionId.value
+        if (currentSession.isBlank()) return
+        
+        viewModelScope.launch {
+            try {
+                firestoreRepository.addManualUser(name, currentSession)
+                onSuccess()
+            } catch (e: Exception) {
+                onError(e.message ?: "Failed to add manual member")
+            }
+        }
+    }
+
     fun signOut() {
         viewModelScope.launch {
             authRepository.signOut()

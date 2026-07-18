@@ -83,6 +83,26 @@ class FirestoreRepository {
         return null
     }
 
+    suspend fun addManualUser(name: String, sessionId: String) {
+        val newUid = "manual_" + UUID.randomUUID().toString().substring(0, 8)
+        val user = User(
+            uid = newUid,
+            email = "",
+            name = name,
+            photoUrl = "https://ui-avatars.com/api/?name=${name.replace(" ", "+")}"
+        )
+        db.collection("users").document(newUid).set(user).await()
+
+        val snapshot = db.collection("sessions").document(sessionId).get().await()
+        val session = snapshot.toObject(Session::class.java)
+        if (session != null) {
+            val updatedMembers = session.memberUids.toMutableSet().apply { add(newUid) }.toList()
+            db.collection("sessions").document(sessionId)
+                .update("memberUids", updatedMembers)
+                .await()
+        }
+    }
+
     fun getUserSessions(uid: String): Flow<List<Session>> = callbackFlow {
         val listener = db.collection("sessions")
             .whereArrayContains("memberUids", uid)

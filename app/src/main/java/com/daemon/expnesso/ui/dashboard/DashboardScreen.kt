@@ -112,6 +112,7 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
 
     ModalNavigationDrawer(
         drawerState = drawerState,
+        gesturesEnabled = false,
         drawerContent = {
             ModalDrawerSheet(
                 drawerContainerColor = PremiumSurface,
@@ -294,6 +295,11 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
             }
         }
 
+        LaunchedEffect(session?.id) {
+            headerState.targetState = true
+            listState.scrollToItem(0)
+        }
+
         Column(
             modifier = Modifier
                 .padding(padding)
@@ -329,18 +335,25 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Text(
-                                            text = targetSession.name,
-                                            fontWeight = FontWeight.Bold,
-                                            color = Color.White,
-                                            fontSize = 22.sp,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                            modifier = Modifier.weight(1f)
-                                        )
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = targetSession.name,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color.White,
+                                                fontSize = 22.sp,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            Text(
+                                                text = "Current Book",
+                                                color = TextSecondary,
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Medium
+                                            )
+                                        }
                                         Row(verticalAlignment = Alignment.CenterVertically) {
-                                            IconButton(onClick = { showInviteDialog = true }) {
-                                                Icon(Icons.Default.Add, contentDescription = "Add Member", tint = Color.White)
+                                            IconButton(onClick = { showAddExpenseDialog = true }) {
+                                                Icon(Icons.Default.Add, contentDescription = "Add Expense", tint = Color.White)
                                             }
                                             Box {
                                                 IconButton(onClick = { menuExpanded = true }) {
@@ -362,6 +375,13 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
                                                             }
                                                         )
                                                     }
+                                                    DropdownMenuItem(
+                                                        text = { Text("Invite Member", color = Color.White) },
+                                                        onClick = {
+                                                            menuExpanded = false
+                                                            showInviteDialog = true
+                                                        }
+                                                    )
                                                     DropdownMenuItem(
                                                         text = { Text("Transactions", color = Color.White) },
                                                         onClick = {
@@ -661,43 +681,123 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
     }
 
     if (showInviteDialog && session != null) {
+        var manualName by remember { mutableStateOf("") }
+        var isAddingManual by remember { mutableStateOf(false) }
+
         AlertDialog(
             onDismissRequest = { showInviteDialog = false },
-            title = { Text("Invite to ${session!!.name}", color = TextPrimary) },
+            title = {
+                Text(
+                    text = "Invite to ${session!!.name}",
+                    color = TextPrimary,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            },
             text = {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-                    Text("Share this code or scan the QR below:", color = TextSecondary)
+                    Text("Share this code or scan the QR", color = TextSecondary, fontSize = 14.sp)
                     Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = session!!.inviteCode,
-                        fontSize = 32.sp,
-                        fontWeight = FontWeight.Black,
-                        color = PrimaryAccent,
-                        letterSpacing = 4.sp
-                    )
-                    Spacer(modifier = Modifier.height(24.dp))
+
                     val qrBitmap = remember(session!!.inviteCode) {
                         QRCodeUtils.generateQRCode(session!!.inviteCode)
                     }
                     if (qrBitmap != null) {
-                        Image(
-                            bitmap = qrBitmap.asImageBitmap(),
-                            contentDescription = "QR Code",
+                        Box(
                             modifier = Modifier
-                                .size(200.dp)
-                                .clip(RoundedCornerShape(12.dp))
+                                .clip(RoundedCornerShape(16.dp))
                                 .background(Color.White)
-                                .padding(8.dp)
+                                .padding(12.dp)
+                        ) {
+                            Image(
+                                bitmap = qrBitmap.asImageBitmap(),
+                                contentDescription = "QR Code",
+                                modifier = Modifier.size(150.dp)
+                            )
+                        }
+                    }
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(PremiumSurfaceVariant)
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                    ) {
+                        Text(
+                            text = session!!.inviteCode,
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.Black,
+                            color = PrimaryAccent,
+                            letterSpacing = 4.sp
                         )
                     }
+
+                    Spacer(modifier = Modifier.height(24.dp))
+                    HorizontalDivider(color = PremiumSurfaceVariant)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    Text("Or add offline member", color = TextSecondary, fontSize = 14.sp)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    OutlinedTextField(
+                        value = manualName,
+                        onValueChange = { manualName = it },
+                        placeholder = { Text("Enter member name", color = TextSecondary.copy(alpha = 0.5f)) },
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = PrimaryAccent,
+                            unfocusedBorderColor = PremiumSurfaceVariant,
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary
+                        ),
+                        modifier = Modifier.fillMaxWidth(),
+                        trailingIcon = {
+                            if (isAddingManual) {
+                                androidx.compose.material3.CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp),
+                                    color = PrimaryAccent,
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                IconButton(
+                                    onClick = {
+                                        isAddingManual = true
+                                        viewModel.addManualMember(
+                                            name = manualName,
+                                            onSuccess = {
+                                                isAddingManual = false
+                                                manualName = ""
+                                                Toast.makeText(context, "Added successfully", Toast.LENGTH_SHORT).show()
+                                            },
+                                            onError = {
+                                                isAddingManual = false
+                                                Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
+                                            }
+                                        )
+                                    },
+                                    enabled = manualName.isNotBlank()
+                                ) {
+                                    Icon(
+                                        Icons.Default.Add,
+                                        contentDescription = "Add Member",
+                                        tint = if (manualName.isNotBlank()) PrimaryAccent else TextSecondary.copy(alpha = 0.5f)
+                                    )
+                                }
+                            }
+                        }
+                    )
                 }
             },
             confirmButton = {
-                Button(onClick = { showInviteDialog = false }, colors = ButtonDefaults.buttonColors(containerColor = PrimaryAccent)) {
-                    Text("Close", color = Color.Black)
+                TextButton(onClick = { showInviteDialog = false }) {
+                    Text("Close", color = TextSecondary)
                 }
             },
-            containerColor = PremiumSurface
+            containerColor = PremiumSurface,
+            shape = RoundedCornerShape(24.dp)
         )
     }
 
