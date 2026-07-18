@@ -49,8 +49,13 @@ class DashboardViewModel(
     private val _totalSpent = MutableStateFlow(0.0)
     val totalSpent: StateFlow<Double> = _totalSpent
 
+    // Map of sessionId -> Pair(willGet, willPay)
+    private val _sessionBalances = MutableStateFlow<Map<String, Pair<Double, Double>>>(emptyMap())
+    val sessionBalances: StateFlow<Map<String, Pair<Double, Double>>> = _sessionBalances
+
     private var sessionJob: Job? = null
     private var transactionsJob: Job? = null
+    private val sessionBalanceJobs = mutableMapOf<String, Job>()
 
     init {
         loadAllSessions()
@@ -61,6 +66,7 @@ class DashboardViewModel(
         viewModelScope.launch {
             firestoreRepository.getUserSessions(currentUserId).collect { sessions ->
                 _allSessions.value = sessions
+                calculateAllSessionBalances(sessions)
             }
         }
     }
@@ -147,6 +153,71 @@ class DashboardViewModel(
         _myDebts.value = allDebts.filter { it.fromUid == currentUserId }
     }
 
+    private fun calculateAllSessionBalances(sessions: List<Session>) {
+        val currentSessionIds = sessions.map { it.id }
+        
+        // Cancel jobs for removed sessions
+        sessionBalanceJobs.keys.toList().forEach { id ->
+            if (id !in currentSessionIds) {
+                sessionBalanceJobs[id]?.cancel()
+                sessionBalanceJobs.remove(id)
+                _sessionBalances.value = _sessionBalances.value - id
+            }
+        }
+        
+        // Start jobs for new sessions
+        sessions.forEach { session ->
+            if (session.id !in sessionBalanceJobs) {
+                sessionBalanceJobs[session.id] = viewModelScope.launch {
+                    firestoreRepository.getSessionTransactions(session.id).collect { txList ->
+                        val balances = mutableMapOf<String, Double>()
+                        session.memberUids.forEach { balances[it] = 0.0 }
+                        
+                        txList.forEach { tx ->
+                            val paidBy = tx.paidByUid.ifEmpty { tx.addedByUid }
+                            balances[paidBy] = (balances[paidBy] ?: 0.0) + tx.amount
+
+                            if (tx.splits.isNotEmpty()) {
+                                tx.splits.forEach { (uid, amountOwed) ->
+                                    balances[uid] = (balances[uid] ?: 0.0) - amountOwed
+                                }
+                            } else {
+                                balances[paidBy] = (balances[paidBy] ?: 0.0) - tx.amount
+                            }
+                        }
+                        
+                        val debtors = balances.filterValues { it < -0.01 }.mapValues { -it.value }.toMutableMap()
+                        val creditors = balances.filterValues { it > 0.01 }.toMutableMap()
+                        
+                        val allDebts = mutableListOf<Debt>()
+                        
+                        while (debtors.isNotEmpty() && creditors.isNotEmpty()) {
+                            val debtor = debtors.keys.first()
+                            val creditor = creditors.keys.first()
+                            
+                            val debtAmount = debtors[debtor]!!
+                            val creditAmount = creditors[creditor]!!
+                            
+                            val settledAmount = minOf(debtAmount, creditAmount)
+                            allDebts.add(Debt(debtor, creditor, settledAmount))
+                            
+                            debtors[debtor] = debtAmount - settledAmount
+                            creditors[creditor] = creditAmount - settledAmount
+                            
+                            if (debtors[debtor]!! < 0.01) debtors.remove(debtor)
+                            if (creditors[creditor]!! < 0.01) creditors.remove(creditor)
+                        }
+                        
+                        val willGet = allDebts.filter { it.toUid == currentUserId }.sumOf { it.amount }
+                        val willPay = allDebts.filter { it.fromUid == currentUserId }.sumOf { it.amount }
+                        
+                        _sessionBalances.value = _sessionBalances.value + (session.id to Pair(willGet, willPay))
+                    }
+                }
+            }
+        }
+    }
+
     fun addTransaction(amount: Double, description: String, paidByUid: String, splits: Map<String, Double>, onSuccess: () -> Unit) {
         viewModelScope.launch {
             val tx = Transaction(
@@ -193,6 +264,38 @@ class DashboardViewModel(
                 }
             } catch (e: Exception) {
                 onError(e.message ?: "Failed to join")
+            }
+        }
+    }
+
+    fun signOut() {
+        viewModelScope.launch {
+            authRepository.signOut()
+        }
+    }
+
+    fun deleteSession(sessionId: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
+        viewModelScope.launch {
+            try {
+                firestoreRepository.softDeleteSession(sessionId)
+                
+                // If the deleted session was the current one, switch to the first available session or clear
+                if (currentSessionId.value == sessionId) {
+                    val remaining = allSessions.value.filter { it.id != sessionId }
+                    if (remaining.isNotEmpty()) {
+                        switchSession(remaining.first().id)
+                    } else {
+                        _session.value = null
+                        _transactions.value = emptyList()
+                        _sessionMembers.value = emptyMap()
+                        _netBalances.value = emptyMap()
+                        _myCredits.value = emptyList()
+                        _myDebts.value = emptyList()
+                    }
+                }
+                onSuccess()
+            } catch (e: Exception) {
+                onError(e.message ?: "Failed to delete book")
             }
         }
     }

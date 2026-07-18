@@ -2,10 +2,16 @@ package com.daemon.expnesso.ui.dashboard
 
 import android.graphics.Bitmap
 import android.widget.Toast
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import kotlinx.coroutines.launch
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -16,12 +22,15 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -34,15 +43,18 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
+import com.daemon.expnesso.data.model.Session
 import com.daemon.expnesso.data.model.Transaction
 import com.daemon.expnesso.data.model.User
 import com.daemon.expnesso.data.repository.AuthRepository
 import com.daemon.expnesso.data.repository.FirestoreRepository
 import com.daemon.expnesso.ui.theme.*
+import com.daemon.expnesso.ui.utils.shimmerEffect
 import com.daemon.expnesso.utils.QRCodeUtils
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.codescanner.GmsBarcodeScannerOptions
@@ -52,11 +64,8 @@ import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DashboardScreen(navController: NavController, initialSessionId: String) {
+fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel) {
     val context = LocalContext.current
-    val authRepository = remember { AuthRepository(context) }
-    val firestoreRepository = remember { FirestoreRepository() }
-    val viewModel = remember { DashboardViewModel(authRepository, firestoreRepository, initialSessionId) }
 
     val transactions by viewModel.transactions.collectAsState()
     val totalSpent by viewModel.totalSpent.collectAsState()
@@ -67,11 +76,12 @@ fun DashboardScreen(navController: NavController, initialSessionId: String) {
 
     // Dialog States
     var showAddExpenseDialog by remember { mutableStateOf(false) }
-    var showDropdown by remember { mutableStateOf(false) }
     var fabExpanded by remember { mutableStateOf(false) }
     var showInviteDialog by remember { mutableStateOf(false) }
     var showCreateBookDialog by remember { mutableStateOf(false) }
     var showJoinBookDialog by remember { mutableStateOf(false) }
+    var showDeleteBookDialog by remember { mutableStateOf(false) }
+    var menuExpanded by remember { mutableStateOf(false) }
 
     val scannerOptions = remember {
         GmsBarcodeScannerOptions.Builder()
@@ -81,15 +91,58 @@ fun DashboardScreen(navController: NavController, initialSessionId: String) {
     }
     val scanner = remember { GmsBarcodeScanning.getClient(context, scannerOptions) }
 
-    Scaffold(
-        containerColor = PremiumBackground,
-        floatingActionButton = {
-            Column(horizontalAlignment = Alignment.End) {
-                AnimatedVisibility(
-                    visible = fabExpanded,
-                    enter = fadeIn(),
-                    exit = fadeOut()
-                ) {
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
+
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            ModalDrawerSheet(
+                drawerContainerColor = PremiumSurface,
+                modifier = Modifier.width(300.dp)
+            ) {
+                Spacer(modifier = Modifier.height(32.dp))
+                Text(
+                    text = "Expnesso",
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.Black,
+                    color = PrimaryAccent,
+                    modifier = Modifier.padding(horizontal = 24.dp)
+                )
+                Spacer(modifier = Modifier.height(32.dp))
+                HorizontalDivider(color = PremiumSurfaceVariant)
+                Spacer(modifier = Modifier.height(16.dp))
+
+                NavigationDrawerItem(
+                    label = { Text("Sign Out", fontSize = 16.sp) },
+                    selected = false,
+                    onClick = {
+                        scope.launch { drawerState.close() }
+                        viewModel.signOut()
+                        navController.navigate("login") {
+                            popUpTo(0) { inclusive = true }
+                        }
+                    },
+                    icon = { Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = "Sign Out", tint = ErrorRed) },
+                    colors = NavigationDrawerItemDefaults.colors(
+                        unselectedContainerColor = Color.Transparent,
+                        unselectedTextColor = ErrorRed,
+                        unselectedIconColor = ErrorRed
+                    ),
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
+            }
+        }
+    ) {
+        Scaffold(
+            containerColor = PremiumBackground,
+            floatingActionButton = {
+                Column(horizontalAlignment = Alignment.End) {
+                    AnimatedVisibility(
+                        visible = fabExpanded,
+                        enter = fadeIn() + slideInVertically(initialOffsetY = { 50 }),
+                        exit = fadeOut() + slideOutVertically(targetOffsetY = { 50 })
+                    ) {
                     Column(
                         horizontalAlignment = Alignment.End,
                         verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -151,44 +204,16 @@ fun DashboardScreen(navController: NavController, initialSessionId: String) {
         topBar = {
             TopAppBar(
                 title = {
-                    Box(modifier = Modifier.wrapContentSize(Alignment.TopStart)) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .clickable { showDropdown = true }
-                                .padding(8.dp)
-                        ) {
-                            Text(
-                                text = session?.name ?: "Loading...",
-                                fontWeight = FontWeight.Bold,
-                                color = TextPrimary,
-                                fontSize = 20.sp
-                            )
-                            Icon(Icons.Default.ArrowDropDown, contentDescription = "Switch Book", tint = TextPrimary)
-                        }
-                        DropdownMenu(
-                            expanded = showDropdown,
-                            onDismissRequest = { showDropdown = false },
-                            modifier = Modifier.background(PremiumSurface)
-                        ) {
-                            allSessions.forEach { s ->
-                                DropdownMenuItem(
-                                    text = { Text(s.name, color = TextPrimary) },
-                                    onClick = {
-                                        viewModel.switchSession(s.id)
-                                        showDropdown = false
-                                    }
-                                )
-                            }
-                        }
-                    }
+                    Text(
+                        text = "Expnesso",
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimary,
+                        fontSize = 20.sp
+                    )
                 },
-                actions = {
-                    IconButton(onClick = { showInviteDialog = true }) {
-                        Icon(Icons.Default.Share, contentDescription = "Invite", tint = TextPrimary)
-                    }
-                    IconButton(onClick = { session?.let { viewModel.setAsDefaultSession(it.id) } }) {
-                        Icon(Icons.Default.Star, contentDescription = "Set Default", tint = SecondaryAccent)
+                navigationIcon = {
+                    IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                        Icon(Icons.Default.Menu, contentDescription = "Menu", tint = TextPrimary)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = PremiumBackground)
@@ -201,150 +226,227 @@ fun DashboardScreen(navController: NavController, initialSessionId: String) {
                 .fillMaxSize()
                 .padding(horizontal = 16.dp)
         ) {
-            val myCredits by viewModel.myCredits.collectAsState()
-            val myDebts by viewModel.myDebts.collectAsState()
-            val currentUser = sessionMembers[viewModel.currentUserId]
-            val myBalance = netBalances[viewModel.currentUserId] ?: 0.0
-
-            val totalWillGet = myCredits.sumOf { it.amount }
-            val totalWillPay = myDebts.sumOf { it.amount }
-
-            // Premium Summary Card
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(Brush.linearGradient(colors = listOf(PremiumSurfaceVariant, PremiumSurface)))
-                    .padding(24.dp)
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    AsyncImage(
-                        model = currentUser?.photoUrl?.ifEmpty { "https://ui-avatars.com/api/?name=${currentUser?.name}" } ?: "https://ui-avatars.com/api/?name=?",
-                        contentDescription = "My Avatar",
-                        modifier = Modifier
-                            .size(72.dp)
-                            .clip(CircleShape)
-                            .background(PremiumSurfaceVariant),
-                        contentScale = ContentScale.Crop
-                    )
-                    Spacer(modifier = Modifier.width(24.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Total Bal: $${String.format("%.2f", myBalance)}",
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Column {
-                                Text("will get", color = TextSecondary, fontSize = 14.sp)
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text("$${String.format("%.2f", totalWillGet)}", color = SuccessGreen, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            AnimatedContent(
+                targetState = session,
+                transitionSpec = {
+                    fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(300))
+                },
+                label = "session_animation"
+            ) { targetSession ->
+                if (targetSession == null) {
+                    Column {
+                        Box(modifier = Modifier.fillMaxWidth().height(150.dp).clip(RoundedCornerShape(24.dp)).shimmerEffect())
+                        Spacer(modifier = Modifier.height(24.dp))
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Box(modifier = Modifier.width(80.dp).height(24.dp).shimmerEffect())
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Box(modifier = Modifier.fillMaxWidth().height(60.dp).clip(RoundedCornerShape(12.dp)).shimmerEffect())
                             }
-                            Column(horizontalAlignment = Alignment.End) {
-                                Text("will pay", color = TextSecondary, fontSize = 14.sp)
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text("$${String.format("%.2f", totalWillPay)}", color = ErrorRed, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                            Column(modifier = Modifier.weight(1f)) {
+                                Box(modifier = Modifier.width(80.dp).height(24.dp).shimmerEffect())
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Box(modifier = Modifier.fillMaxWidth().height(60.dp).clip(RoundedCornerShape(12.dp)).shimmerEffect())
+                            }
+                        }
+                    }
+                } else {
+                    Column {
+                        val myCredits by viewModel.myCredits.collectAsState()
+                        val myDebts by viewModel.myDebts.collectAsState()
+                        val currentUser = sessionMembers[viewModel.currentUserId]
+                        val myBalance = netBalances[viewModel.currentUserId] ?: 0.0
+
+                        val totalWillGet = myCredits.sumOf { it.amount }
+                        val totalWillPay = myDebts.sumOf { it.amount }
+
+                        // Premium Summary Card
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(24.dp))
+                                .background(Brush.linearGradient(colors = listOf(PremiumSurfaceVariant, PremiumSurface)))
+                        ) {
+                            Column(modifier = Modifier.padding(24.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = targetSession.name,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White,
+                                        fontSize = 22.sp,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        IconButton(onClick = { showInviteDialog = true }) {
+                                            Icon(Icons.Default.Add, contentDescription = "Add Member", tint = Color.White)
+                                        }
+                                        Box {
+                                            IconButton(onClick = { menuExpanded = true }) {
+                                                Icon(Icons.Default.MoreVert, contentDescription = "More options", tint = Color.White)
+                                            }
+                                            DropdownMenu(
+                                                expanded = menuExpanded,
+                                                onDismissRequest = { menuExpanded = false },
+                                                containerColor = PremiumSurface
+                                            ) {
+                                                DropdownMenuItem(
+                                                    text = { Text("Transactions", color = Color.White) },
+                                                    onClick = {
+                                                        menuExpanded = false
+                                                        navController.navigate("transactions")
+                                                    }
+                                                )
+                                                DropdownMenuItem(
+                                                    text = { Text("Book Details", color = Color.White) },
+                                                    onClick = {
+                                                        menuExpanded = false
+                                                        navController.navigate("book_details/${targetSession.id}")
+                                                    }
+                                                )
+                                                DropdownMenuItem(
+                                                    text = { Text("Delete Book", color = ErrorRed) },
+                                                    onClick = {
+                                                        menuExpanded = false
+                                                        showDeleteBookDialog = true
+                                                    }
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(20.dp))
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    AsyncImage(
+                                        model = currentUser?.photoUrl?.ifEmpty { "https://ui-avatars.com/api/?name=${currentUser?.name}" } ?: "https://ui-avatars.com/api/?name=?",
+                                        contentDescription = "My Avatar",
+                                        modifier = Modifier
+                                            .size(72.dp)
+                                            .clip(CircleShape)
+                                            .background(PremiumSurfaceVariant),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                    Spacer(modifier = Modifier.width(24.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = "Total Bal: ₹${String.format("%.2f", myBalance)}",
+                                            fontSize = 20.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.White
+                                        )
+                                        Spacer(modifier = Modifier.height(12.dp))
+                                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+
+                                        Column {
+                                            Text("will get", color = TextSecondary, fontSize = 14.sp)
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Text("₹${String.format("%.2f", totalWillGet)}", color = SuccessGreen, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                        Column(horizontalAlignment = Alignment.End) {
+                                            Text("will pay", color = TextSecondary, fontSize = 14.sp)
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Text("₹${String.format("%.2f", totalWillPay)}", color = ErrorRed, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(24.dp))
+
+                        val membersList = sessionMembers.values.toList()
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                            // Left Column (Credits / Owes You)
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Credit", color = SuccessGreen, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                                HorizontalDivider(color = SuccessGreen, modifier = Modifier.padding(vertical = 8.dp))
+                                if (myCredits.isEmpty()) {
+                                    Text("No credits", color = TextSecondary, fontSize = 14.sp)
+                                } else {
+                                    myCredits.forEach { debt ->
+                                        val debtor = sessionMembers[debt.fromUid]
+                                        val firstName = debtor?.name?.split(" ")?.firstOrNull() ?: "Unknown"
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            AsyncImage(
+                                                model = debtor?.photoUrl?.ifEmpty { "https://ui-avatars.com/api/?name=$firstName" } ?: "https://ui-avatars.com/api/?name=?",
+                                                contentDescription = "Avatar",
+                                                modifier = Modifier
+                                                    .size(32.dp)
+                                                    .clip(CircleShape)
+                                                    .background(PremiumSurfaceVariant),
+                                                contentScale = ContentScale.Crop
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Column {
+                                                Text(firstName, color = TextPrimary, fontSize = 14.sp)
+                                                Text("+₹${String.format("%.2f", debt.amount)}", color = SuccessGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                            }
+                                        }
+                                        Spacer(modifier = Modifier.height(12.dp))
+                                    }
+                                }
+                            }
+                            
+                            // Right Column (Debts / You Owe)
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Debt", color = ErrorRed, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                                HorizontalDivider(color = ErrorRed, modifier = Modifier.padding(vertical = 8.dp))
+                                if (myDebts.isEmpty()) {
+                                    Text("No debts", color = TextSecondary, fontSize = 14.sp)
+                                } else {
+                                    myDebts.forEach { debt ->
+                                        val creditor = sessionMembers[debt.toUid]
+                                        val firstName = creditor?.name?.split(" ")?.firstOrNull() ?: "Unknown"
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            AsyncImage(
+                                                model = creditor?.photoUrl?.ifEmpty { "https://ui-avatars.com/api/?name=$firstName" } ?: "https://ui-avatars.com/api/?name=?",
+                                                contentDescription = "Avatar",
+                                                modifier = Modifier
+                                                    .size(32.dp)
+                                                    .clip(CircleShape)
+                                                    .background(PremiumSurfaceVariant),
+                                                contentScale = ContentScale.Crop
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Column {
+                                                Text(firstName, color = TextPrimary, fontSize = 14.sp)
+                                                Text("-₹${String.format("%.2f", debt.amount)}", color = ErrorRed, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                            }
+                                        }
+                                        Spacer(modifier = Modifier.height(12.dp))
+                                    }
+                                }
                             }
                         }
                     }
                 }
             }
-
             Spacer(modifier = Modifier.height(24.dp))
 
-            val membersList = sessionMembers.values.toList()
-            if (membersList.size > 1) {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    // Left Column (Credits / Owes You)
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Credit", color = SuccessGreen, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                        HorizontalDivider(color = SuccessGreen, modifier = Modifier.padding(vertical = 8.dp))
-                        if (myCredits.isEmpty()) {
-                            Text("No credits", color = TextSecondary, fontSize = 14.sp)
-                        } else {
-                            myCredits.forEach { debt ->
-                                val debtor = sessionMembers[debt.fromUid]
-                                val firstName = debtor?.name?.split(" ")?.firstOrNull() ?: "Unknown"
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    AsyncImage(
-                                        model = debtor?.photoUrl?.ifEmpty { "https://ui-avatars.com/api/?name=$firstName" } ?: "https://ui-avatars.com/api/?name=?",
-                                        contentDescription = "Avatar",
-                                        modifier = Modifier
-                                            .size(32.dp)
-                                            .clip(CircleShape)
-                                            .background(PremiumSurfaceVariant),
-                                        contentScale = ContentScale.Crop
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Column {
-                                        Text(firstName, color = TextPrimary, fontSize = 14.sp)
-                                        Text("+$${String.format("%.2f", debt.amount)}", color = SuccessGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                                    }
-                                }
-                                Spacer(modifier = Modifier.height(12.dp))
-                            }
-                        }
-                    }
-                    
-                    // Right Column (Debts / You Owe)
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Debt", color = ErrorRed, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                        HorizontalDivider(color = ErrorRed, modifier = Modifier.padding(vertical = 8.dp))
-                        if (myDebts.isEmpty()) {
-                            Text("No debts", color = TextSecondary, fontSize = 14.sp)
-                        } else {
-                            myDebts.forEach { debt ->
-                                val creditor = sessionMembers[debt.toUid]
-                                val firstName = creditor?.name?.split(" ")?.firstOrNull() ?: "Unknown"
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    AsyncImage(
-                                        model = creditor?.photoUrl?.ifEmpty { "https://ui-avatars.com/api/?name=$firstName" } ?: "https://ui-avatars.com/api/?name=?",
-                                        contentDescription = "Avatar",
-                                        modifier = Modifier
-                                            .size(32.dp)
-                                            .clip(CircleShape)
-                                            .background(PremiumSurfaceVariant),
-                                        contentScale = ContentScale.Crop
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Column {
-                                        Text(firstName, color = TextPrimary, fontSize = 14.sp)
-                                        Text("-$${String.format("%.2f", debt.amount)}", color = ErrorRed, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                                    }
-                                }
-                                Spacer(modifier = Modifier.height(12.dp))
-                            }
-                        }
-                    }
-                }
-                Spacer(modifier = Modifier.height(24.dp))
-            }
-
-            Text("Transactions", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+            Text("Your Books", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
             Spacer(modifier = Modifier.height(16.dp))
+
+            val sessionBalances by viewModel.sessionBalances.collectAsState()
 
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier.weight(1f)
             ) {
-                items(transactions) { tx ->
-                    AnimatedVisibility(
-                        visible = true,
-                        enter = fadeIn(animationSpec = tween(500)),
-                        exit = fadeOut(animationSpec = tween(500))
-                    ) {
-                        TransactionItem(
-                            transaction = tx,
-                            paidBy = sessionMembers[tx.paidByUid.ifEmpty { tx.addedByUid }],
-                            currentUserId = viewModel.currentUserId,
-                            adminUid = session?.adminUid,
-                            onDelete = {
-                                viewModel.deleteTransaction(tx.id, session?.adminUid ?: "", tx.addedByUid)
-                            }
-                        )
-                    }
+                items(allSessions) { s ->
+                    val balances = sessionBalances[s.id] ?: Pair(0.0, 0.0)
+                    BookItem(
+                        session = s,
+                        willGet = balances.first,
+                        willPay = balances.second,
+                        isSelected = s.id == session?.id,
+                        onClick = { viewModel.switchSession(s.id) }
+                    )
                 }
             }
         }
@@ -513,21 +615,65 @@ fun DashboardScreen(navController: NavController, initialSessionId: String) {
             containerColor = PremiumSurface
         )
     }
-}
 
+    if (showDeleteBookDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteBookDialog = false },
+            title = { Text("Delete Book", color = ErrorRed, fontWeight = FontWeight.Bold) },
+            text = {
+                Text(
+                    text = "Are you sure you want to delete this book? This will move it to the bin, and you can restore it within 30 days.",
+                    color = TextPrimary
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        session?.let { currentSession ->
+                            viewModel.deleteSession(
+                                sessionId = currentSession.id,
+                                onSuccess = {
+                                    Toast.makeText(context, "Book moved to bin", Toast.LENGTH_SHORT).show()
+                                    showDeleteBookDialog = false
+                                },
+                                onError = {
+                                    Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+                                    showDeleteBookDialog = false
+                                }
+                            )
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = ErrorRed)
+                ) {
+                    Text("Delete", color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteBookDialog = false }) {
+                    Text("Cancel", color = TextSecondary)
+                }
+            },
+            containerColor = PremiumSurface
+        )
+    }
+    } // Closes Scaffold
+} // Closes ModalNavigationDrawer
+// Closes DashboardScreen
 @Composable
-fun TransactionItem(
-    transaction: Transaction,
-    paidBy: User?,
-    currentUserId: String?,
-    adminUid: String?,
-    onDelete: () -> Unit
+fun BookItem(
+    session: Session,
+    willGet: Double,
+    willPay: Double,
+    isSelected: Boolean,
+    onClick: () -> Unit
 ) {
-    val canDelete = currentUserId == adminUid || currentUserId == transaction.addedByUid
-
     Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = PremiumSurface),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
+        colors = CardDefaults.cardColors(
+            containerColor = if (isSelected) PremiumSurfaceVariant else PremiumSurface
+        ),
         shape = RoundedCornerShape(16.dp)
     ) {
         Row(
@@ -536,32 +682,16 @@ fun TransactionItem(
                 .fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            AsyncImage(
-                model = paidBy?.photoUrl?.ifEmpty { "https://ui-avatars.com/api/?name=${paidBy.name}" } ?: "https://ui-avatars.com/api/?name=?",
-                contentDescription = "Avatar",
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(CircleShape)
-                    .background(PremiumSurfaceVariant),
-                contentScale = ContentScale.Crop
-            )
-            Spacer(modifier = Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(transaction.description, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Medium)
-                val sdf = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault())
-                Text("${sdf.format(transaction.timestamp.toDate())} • Paid by ${paidBy?.name ?: "Unknown"}", color = TextSecondary, fontSize = 12.sp)
-            }
-            Text(
-                text = "$${String.format("%.2f", transaction.amount)}",
-                color = Color.White,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold
-            )
-
-            if (canDelete) {
-                IconButton(onClick = onDelete) {
-                    Icon(Icons.Default.Delete, contentDescription = "Delete", tint = ErrorRed)
+                Text(session.name, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Text("Get: +₹${String.format("%.2f", willGet)}", color = SuccessGreen, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                    Text("Pay: -₹${String.format("%.2f", willPay)}", color = ErrorRed, fontSize = 14.sp, fontWeight = FontWeight.Medium)
                 }
+            }
+            if (isSelected) {
+                Icon(Icons.Default.Star, contentDescription = "Current", tint = SecondaryAccent)
             }
         }
     }

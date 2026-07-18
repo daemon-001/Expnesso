@@ -92,11 +92,23 @@ class FirestoreRepository {
                     return@addSnapshotListener
                 }
                 if (snapshot != null) {
-                    val sessions = snapshot.documents.mapNotNull { it.toObject(Session::class.java) }
+                    val sessions = snapshot.documents
+                        .mapNotNull { it.toObject(Session::class.java) }
+                        .filter { !it.isDeleted }
                     trySend(sessions)
                 }
             }
         awaitClose { listener.remove() }
+    }
+
+    suspend fun softDeleteSession(sessionId: String) {
+        db.collection("sessions").document(sessionId)
+            .update(
+                mapOf(
+                    "isDeleted" to true,
+                    "deletedAt" to com.google.firebase.Timestamp.now()
+                )
+            ).await()
     }
 
     suspend fun addTransaction(transaction: Transaction) {

@@ -19,7 +19,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.painterResource
 import androidx.navigation.NavController
+import com.daemon.expnesso.R
 import com.daemon.expnesso.data.repository.AuthRepository
 import com.daemon.expnesso.navigation.Screen
 import com.daemon.expnesso.ui.theme.PrimaryAccent
@@ -147,6 +149,13 @@ fun LoginScreen(navController: NavController) {
                         contentColor = Color.Black
                     )
                 ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_google),
+                        contentDescription = "Google Logo",
+                        modifier = Modifier.size(24.dp),
+                        tint = Color.Unspecified
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
                     Text("Continue with Google", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
                 }
             }

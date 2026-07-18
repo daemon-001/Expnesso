@@ -16,7 +16,9 @@ data class Session(
     val adminUid: String = "",
     val inviteCode: String = "",
     val memberUids: List<String> = emptyList(),
-    val createdAt: Timestamp = Timestamp.now()
+    val createdAt: Timestamp = Timestamp.now(),
+    val isDeleted: Boolean = false,
+    val deletedAt: Timestamp? = null
 )
 
 data class Transaction(

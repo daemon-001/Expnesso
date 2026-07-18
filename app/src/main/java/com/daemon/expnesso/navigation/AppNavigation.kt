@@ -11,11 +11,15 @@ sealed class Screen(val route: String) {
     object Dashboard : Screen("dashboard/{sessionId}") {
         fun createRoute(sessionId: String) = "dashboard/$sessionId"
     }
+    object BookDetails : Screen("book_details/{sessionId}") {
+        fun createRoute(sessionId: String) = "book_details/$sessionId"
+    }
 }
 
 @Composable
 fun AppNavigation() {
     val navController = rememberNavController()
+    var sharedDashboardViewModel: com.daemon.expnesso.ui.dashboard.DashboardViewModel? = null
     
     // Default to Login for now, we will handle auth state later
     NavHost(navController = navController, startDestination = Screen.Login.route) {
@@ -27,7 +31,27 @@ fun AppNavigation() {
         }
         composable(Screen.Dashboard.route) { backStackEntry ->
             val sessionId = backStackEntry.arguments?.getString("sessionId") ?: ""
-            com.daemon.expnesso.ui.dashboard.DashboardScreen(navController, sessionId)
+            val context = androidx.compose.ui.platform.LocalContext.current
+            val authRepository = androidx.compose.runtime.remember { com.daemon.expnesso.data.repository.AuthRepository(context) }
+            val firestoreRepository = androidx.compose.runtime.remember { com.daemon.expnesso.data.repository.FirestoreRepository() }
+            
+            // Re-instantiate or reuse the viewModel if sessionId changes
+            val viewModel = androidx.compose.runtime.remember(sessionId) { 
+                com.daemon.expnesso.ui.dashboard.DashboardViewModel(authRepository, firestoreRepository, sessionId) 
+            }
+            sharedDashboardViewModel = viewModel
+            com.daemon.expnesso.ui.dashboard.DashboardScreen(navController, viewModel)
+        }
+        composable("transactions") {
+            sharedDashboardViewModel?.let { vm ->
+                com.daemon.expnesso.ui.dashboard.TransactionsScreen(navController, vm)
+            }
+        }
+        composable(Screen.BookDetails.route) { backStackEntry ->
+            val sessionId = backStackEntry.arguments?.getString("sessionId") ?: ""
+            sharedDashboardViewModel?.let { vm ->
+                com.daemon.expnesso.ui.dashboard.BookDetailsScreen(navController, vm, sessionId)
+            }
         }
     }
 }
