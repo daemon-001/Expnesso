@@ -22,6 +22,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -48,6 +49,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -242,14 +245,60 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
         val totalWillPay = myDebts.sumOf { it.amount }
 
         val listState = rememberLazyListState()
-        val isScrolled by remember {
-            derivedStateOf { listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 20 }
+        val headerState = remember { androidx.compose.animation.core.MutableTransitionState(true) }
+        var isConsumingCurrentGesture by remember { mutableStateOf(false) }
+
+        val nestedScrollConnection = remember {
+            object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
+                override fun onPreScroll(available: androidx.compose.ui.geometry.Offset, source: androidx.compose.ui.input.nestedscroll.NestedScrollSource): androidx.compose.ui.geometry.Offset {
+                    if (available.y < 0) {
+                        if (headerState.targetState) {
+                            headerState.targetState = false
+                            isConsumingCurrentGesture = true
+                        }
+                        if (isConsumingCurrentGesture) {
+                            return androidx.compose.ui.geometry.Offset(0f, available.y)
+                        }
+                    } else if (available.y > 0) {
+                        if (isConsumingCurrentGesture) {
+                            return androidx.compose.ui.geometry.Offset(0f, available.y)
+                        }
+                    }
+                    return androidx.compose.ui.geometry.Offset.Zero
+                }
+
+                override fun onPostScroll(
+                    consumed: androidx.compose.ui.geometry.Offset,
+                    available: androidx.compose.ui.geometry.Offset,
+                    source: androidx.compose.ui.input.nestedscroll.NestedScrollSource
+                ): androidx.compose.ui.geometry.Offset {
+                    if (available.y > 0) {
+                        if (!headerState.targetState) {
+                            headerState.targetState = true
+                            isConsumingCurrentGesture = true
+                        }
+                        if (isConsumingCurrentGesture) {
+                            return androidx.compose.ui.geometry.Offset(0f, available.y)
+                        }
+                    }
+                    return androidx.compose.ui.geometry.Offset.Zero
+                }
+
+                override suspend fun onPreFling(available: androidx.compose.ui.unit.Velocity): androidx.compose.ui.unit.Velocity {
+                    if (isConsumingCurrentGesture) {
+                        isConsumingCurrentGesture = false
+                        return available
+                    }
+                    return androidx.compose.ui.unit.Velocity.Zero
+                }
+            }
         }
 
         Column(
             modifier = Modifier
                 .padding(padding)
                 .fillMaxSize()
+                .nestedScroll(nestedScrollConnection)
         ) {
             // Dashboard Card fixed at the top
             Box(modifier = Modifier.padding(horizontal = 16.dp)) {
@@ -430,11 +479,20 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
 
             // Collapsible Mid Section
             AnimatedVisibility(
-                visible = !isScrolled,
+                visibleState = headerState,
                 enter = expandVertically(animationSpec = androidx.compose.animation.core.tween(300)) + androidx.compose.animation.fadeIn(animationSpec = androidx.compose.animation.core.tween(300)),
                 exit = shrinkVertically(animationSpec = androidx.compose.animation.core.tween(300)) + androidx.compose.animation.fadeOut(animationSpec = androidx.compose.animation.core.tween(300))
             ) {
-                Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                Column(modifier = Modifier
+                    .padding(horizontal = 16.dp)
+                    .pointerInput(Unit) {
+                        detectVerticalDragGestures { _, dragAmount ->
+                            if (dragAmount < -5f) { // Swiped up
+                                headerState.targetState = false
+                            }
+                        }
+                    }
+                ) {
                     Spacer(modifier = Modifier.height(12.dp))
                     AnimatedContent(
                     targetState = session,
@@ -579,6 +637,7 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
                         willGet = balances.first,
                         willPay = balances.second,
                         isSelected = s.id == session?.id,
+                        isDefault = s.id == currentUser?.defaultSessionId,
                         onClick = { viewModel.switchSession(s.id) }
                     )
                 }
@@ -798,6 +857,7 @@ fun BookItem(
     willGet: Double,
     willPay: Double,
     isSelected: Boolean,
+    isDefault: Boolean = false,
     onClick: () -> Unit
 ) {
     Card(
@@ -823,8 +883,8 @@ fun BookItem(
                     Text("Pay: -₹${String.format("%.2f", willPay)}", color = ErrorRed, fontSize = 14.sp, fontWeight = FontWeight.Medium)
                 }
             }
-            if (isSelected) {
-                Icon(Icons.Default.Star, contentDescription = "Current", tint = SecondaryAccent)
+            if (isDefault) {
+                Icon(Icons.Default.Star, contentDescription = "Default", tint = SecondaryAccent)
             }
         }
     }
