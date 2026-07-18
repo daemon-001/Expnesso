@@ -302,6 +302,17 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
                                                     onDismissRequest = { menuExpanded = false },
                                                     containerColor = PremiumSurface
                                                 ) {
+                                                    val isDefault = currentUser?.defaultSessionId == targetSession.id
+                                                    if (!isDefault) {
+                                                        DropdownMenuItem(
+                                                            text = { Text("Set as Default", color = Color.White) },
+                                                            onClick = {
+                                                                menuExpanded = false
+                                                                viewModel.setAsDefaultSession(targetSession.id)
+                                                                Toast.makeText(context, "${targetSession.name} set as default", Toast.LENGTH_SHORT).show()
+                                                            }
+                                                        )
+                                                    }
                                                     DropdownMenuItem(
                                                         text = { Text("Transactions", color = Color.White) },
                                                         onClick = {

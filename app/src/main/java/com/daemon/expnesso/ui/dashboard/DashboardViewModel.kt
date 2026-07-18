@@ -103,6 +103,12 @@ class DashboardViewModel(
     fun setAsDefaultSession(sessionId: String) {
         viewModelScope.launch {
             firestoreRepository.setDefaultSession(currentUserId, sessionId)
+            val currentMembers = _sessionMembers.value.toMutableMap()
+            val me = currentMembers[currentUserId]
+            if (me != null) {
+                currentMembers[currentUserId] = me.copy(defaultSessionId = sessionId)
+                _sessionMembers.value = currentMembers
+            }
         }
     }
 
