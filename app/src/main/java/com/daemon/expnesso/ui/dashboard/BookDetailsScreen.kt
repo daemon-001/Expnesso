@@ -30,6 +30,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
+import com.airbnb.lottie.compose.LottieAnimation
+import com.airbnb.lottie.compose.LottieCompositionSpec
+import com.airbnb.lottie.compose.LottieConstants
+import com.airbnb.lottie.compose.rememberLottieComposition
+import com.daemon.expnesso.R
 import com.daemon.expnesso.data.model.User
 import com.daemon.expnesso.ui.theme.*
 import java.text.SimpleDateFormat
@@ -121,19 +126,44 @@ fun BookDetailsScreen(
                 Spacer(modifier = Modifier.height(32.dp))
             }
 
-            item {
-                Text(
-                    text = "Member Balances",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = TextPrimary
-                )
-                Spacer(modifier = Modifier.height(16.dp))
+            if (transactions.isEmpty() || totalSpent == 0.0) {
+                item {
+                    val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.no_history))
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        LottieAnimation(
+                            composition = composition,
+                            iterations = LottieConstants.IterateForever,
+                            modifier = Modifier.size(200.dp)
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = "No expenses added yet",
+                            color = TextSecondary,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+            } else {
+                item {
+                    Text(
+                        text = "Member Balances",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimary
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
 
-                // Custom Bar Chart for balances
-                if (netBalances.isNotEmpty()) {
-                    BalanceBarChart(netBalances = netBalances, members = sessionMembers)
-                    Spacer(modifier = Modifier.height(32.dp))
+                    // Custom Bar Chart for balances
+                    if (netBalances.isNotEmpty()) {
+                        BalanceBarChart(netBalances = netBalances, members = sessionMembers)
+                        Spacer(modifier = Modifier.height(32.dp))
+                    }
                 }
             }
 

@@ -4,6 +4,12 @@ import android.graphics.Bitmap
 import android.widget.Toast
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.lazy.rememberLazyListState
+
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -17,6 +23,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -48,6 +55,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
+import com.airbnb.lottie.compose.LottieAnimation
+import com.airbnb.lottie.compose.LottieCompositionSpec
+import com.airbnb.lottie.compose.LottieConstants
+import com.airbnb.lottie.compose.rememberLottieComposition
+import com.daemon.expnesso.R
 import com.daemon.expnesso.data.model.Session
 import com.daemon.expnesso.data.model.Transaction
 import com.daemon.expnesso.data.model.User
@@ -62,7 +74,7 @@ import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
 import java.text.SimpleDateFormat
 import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel) {
     val context = LocalContext.current
@@ -220,206 +232,132 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
             )
         }
     ) { padding ->
+        val sessionBalances by viewModel.sessionBalances.collectAsState()
+        val myCredits by viewModel.myCredits.collectAsState()
+        val myDebts by viewModel.myDebts.collectAsState()
+        val currentUser = sessionMembers[viewModel.currentUserId]
+        val myBalance = netBalances[viewModel.currentUserId] ?: 0.0
+        val totalWillGet = myCredits.sumOf { it.amount }
+        val totalWillPay = myDebts.sumOf { it.amount }
+
+        val listState = rememberLazyListState()
+        val isScrolled by remember {
+            derivedStateOf { listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 20 }
+        }
+
         Column(
             modifier = Modifier
                 .padding(padding)
                 .fillMaxSize()
-                .padding(horizontal = 16.dp)
         ) {
-            AnimatedContent(
-                targetState = session,
-                transitionSpec = {
-                    fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(300))
-                },
-                label = "session_animation"
-            ) { targetSession ->
-                if (targetSession == null) {
-                    Column {
-                        Box(modifier = Modifier.fillMaxWidth().height(150.dp).clip(RoundedCornerShape(24.dp)).shimmerEffect())
-                        Spacer(modifier = Modifier.height(24.dp))
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Box(modifier = Modifier.width(80.dp).height(24.dp).shimmerEffect())
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Box(modifier = Modifier.fillMaxWidth().height(60.dp).clip(RoundedCornerShape(12.dp)).shimmerEffect())
-                            }
-                            Column(modifier = Modifier.weight(1f)) {
-                                Box(modifier = Modifier.width(80.dp).height(24.dp).shimmerEffect())
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Box(modifier = Modifier.fillMaxWidth().height(60.dp).clip(RoundedCornerShape(12.dp)).shimmerEffect())
-                            }
+            // Dashboard Card fixed at the top
+            Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                AnimatedContent(
+                    targetState = session,
+                    transitionSpec = {
+                        fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(300))
+                    },
+                    label = "session_animation_header"
+                ) { targetSession ->
+                    if (targetSession == null) {
+                        Column(modifier = Modifier.background(PremiumBackground)) {
+                            Box(modifier = Modifier.fillMaxWidth().height(150.dp).clip(RoundedCornerShape(24.dp)).shimmerEffect())
                         }
-                    }
-                } else {
-                    Column {
-                        val myCredits by viewModel.myCredits.collectAsState()
-                        val myDebts by viewModel.myDebts.collectAsState()
-                        val currentUser = sessionMembers[viewModel.currentUserId]
-                        val myBalance = netBalances[viewModel.currentUserId] ?: 0.0
-
-                        val totalWillGet = myCredits.sumOf { it.amount }
-                        val totalWillPay = myDebts.sumOf { it.amount }
-
-                        // Premium Summary Card
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(24.dp))
-                                .background(Brush.linearGradient(colors = listOf(PremiumSurfaceVariant, PremiumSurface)))
-                        ) {
-                            Column(modifier = Modifier.padding(24.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = targetSession.name,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color.White,
-                                        fontSize = 22.sp,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        IconButton(onClick = { showInviteDialog = true }) {
-                                            Icon(Icons.Default.Add, contentDescription = "Add Member", tint = Color.White)
-                                        }
-                                        Box {
-                                            IconButton(onClick = { menuExpanded = true }) {
-                                                Icon(Icons.Default.MoreVert, contentDescription = "More options", tint = Color.White)
-                                            }
-                                            DropdownMenu(
-                                                expanded = menuExpanded,
-                                                onDismissRequest = { menuExpanded = false },
-                                                containerColor = PremiumSurface
-                                            ) {
-                                                DropdownMenuItem(
-                                                    text = { Text("Transactions", color = Color.White) },
-                                                    onClick = {
-                                                        menuExpanded = false
-                                                        navController.navigate("transactions")
-                                                    }
-                                                )
-                                                DropdownMenuItem(
-                                                    text = { Text("Book Details", color = Color.White) },
-                                                    onClick = {
-                                                        menuExpanded = false
-                                                        navController.navigate("book_details/${targetSession.id}")
-                                                    }
-                                                )
-                                                DropdownMenuItem(
-                                                    text = { Text("Delete Book", color = ErrorRed) },
-                                                    onClick = {
-                                                        menuExpanded = false
-                                                        showDeleteBookDialog = true
-                                                    }
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                                Spacer(modifier = Modifier.height(20.dp))
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    AsyncImage(
-                                        model = currentUser?.photoUrl?.ifEmpty { "https://ui-avatars.com/api/?name=${currentUser?.name}" } ?: "https://ui-avatars.com/api/?name=?",
-                                        contentDescription = "My Avatar",
-                                        modifier = Modifier
-                                            .size(72.dp)
-                                            .clip(CircleShape)
-                                            .background(PremiumSurfaceVariant),
-                                        contentScale = ContentScale.Crop
-                                    )
-                                    Spacer(modifier = Modifier.width(24.dp))
-                                    Column(modifier = Modifier.weight(1f)) {
+                    } else {
+                        Column(modifier = Modifier.background(PremiumBackground)) {
+                            // Premium Summary Card
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(24.dp))
+                                    .background(Brush.linearGradient(colors = listOf(PremiumSurfaceVariant, PremiumSurface)))
+                            ) {
+                                Column(modifier = Modifier.padding(24.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
                                         Text(
-                                            text = "Total Bal: ₹${String.format("%.2f", myBalance)}",
-                                            fontSize = 20.sp,
+                                            text = targetSession.name,
                                             fontWeight = FontWeight.Bold,
-                                            color = Color.White
+                                            color = Color.White,
+                                            fontSize = 22.sp,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.weight(1f)
                                         )
-                                        Spacer(modifier = Modifier.height(12.dp))
-                                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-
-                                        Column {
-                                            Text("will get", color = TextSecondary, fontSize = 14.sp)
-                                            Spacer(modifier = Modifier.height(4.dp))
-                                            Text("₹${String.format("%.2f", totalWillGet)}", color = SuccessGreen, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                                        }
-                                        Column(horizontalAlignment = Alignment.End) {
-                                            Text("will pay", color = TextSecondary, fontSize = 14.sp)
-                                            Spacer(modifier = Modifier.height(4.dp))
-                                            Text("₹${String.format("%.2f", totalWillPay)}", color = ErrorRed, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                                        }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(24.dp))
-
-                        val membersList = sessionMembers.values.toList()
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                            // Left Column (Credits / Owes You)
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text("Credit", color = SuccessGreen, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                                HorizontalDivider(color = SuccessGreen, modifier = Modifier.padding(vertical = 8.dp))
-                                if (myCredits.isEmpty()) {
-                                    Text("No credits", color = TextSecondary, fontSize = 14.sp)
-                                } else {
-                                    myCredits.forEach { debt ->
-                                        val debtor = sessionMembers[debt.fromUid]
-                                        val firstName = debtor?.name?.split(" ")?.firstOrNull() ?: "Unknown"
                                         Row(verticalAlignment = Alignment.CenterVertically) {
-                                            AsyncImage(
-                                                model = debtor?.photoUrl?.ifEmpty { "https://ui-avatars.com/api/?name=$firstName" } ?: "https://ui-avatars.com/api/?name=?",
-                                                contentDescription = "Avatar",
-                                                modifier = Modifier
-                                                    .size(32.dp)
-                                                    .clip(CircleShape)
-                                                    .background(PremiumSurfaceVariant),
-                                                contentScale = ContentScale.Crop
-                                            )
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                            Column {
-                                                Text(firstName, color = TextPrimary, fontSize = 14.sp)
-                                                Text("+₹${String.format("%.2f", debt.amount)}", color = SuccessGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                            IconButton(onClick = { showInviteDialog = true }) {
+                                                Icon(Icons.Default.Add, contentDescription = "Add Member", tint = Color.White)
+                                            }
+                                            Box {
+                                                IconButton(onClick = { menuExpanded = true }) {
+                                                    Icon(Icons.Default.MoreVert, contentDescription = "More options", tint = Color.White)
+                                                }
+                                                DropdownMenu(
+                                                    expanded = menuExpanded,
+                                                    onDismissRequest = { menuExpanded = false },
+                                                    containerColor = PremiumSurface
+                                                ) {
+                                                    DropdownMenuItem(
+                                                        text = { Text("Transactions", color = Color.White) },
+                                                        onClick = {
+                                                            menuExpanded = false
+                                                            navController.navigate("transactions")
+                                                        }
+                                                    )
+                                                    DropdownMenuItem(
+                                                        text = { Text("Book Details", color = Color.White) },
+                                                        onClick = {
+                                                            menuExpanded = false
+                                                            navController.navigate("book_details/${targetSession.id}")
+                                                        }
+                                                    )
+                                                    DropdownMenuItem(
+                                                        text = { Text("Delete Book", color = ErrorRed) },
+                                                        onClick = {
+                                                            menuExpanded = false
+                                                            showDeleteBookDialog = true
+                                                        }
+                                                    )
+                                                }
                                             }
                                         }
-                                        Spacer(modifier = Modifier.height(12.dp))
                                     }
-                                }
-                            }
-                            
-                            // Right Column (Debts / You Owe)
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text("Debt", color = ErrorRed, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                                HorizontalDivider(color = ErrorRed, modifier = Modifier.padding(vertical = 8.dp))
-                                if (myDebts.isEmpty()) {
-                                    Text("No debts", color = TextSecondary, fontSize = 14.sp)
-                                } else {
-                                    myDebts.forEach { debt ->
-                                        val creditor = sessionMembers[debt.toUid]
-                                        val firstName = creditor?.name?.split(" ")?.firstOrNull() ?: "Unknown"
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            AsyncImage(
-                                                model = creditor?.photoUrl?.ifEmpty { "https://ui-avatars.com/api/?name=$firstName" } ?: "https://ui-avatars.com/api/?name=?",
-                                                contentDescription = "Avatar",
-                                                modifier = Modifier
-                                                    .size(32.dp)
-                                                    .clip(CircleShape)
-                                                    .background(PremiumSurfaceVariant),
-                                                contentScale = ContentScale.Crop
+                                    Spacer(modifier = Modifier.height(20.dp))
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        AsyncImage(
+                                            model = currentUser?.photoUrl?.ifEmpty { "https://ui-avatars.com/api/?name=${currentUser?.name}" } ?: "https://ui-avatars.com/api/?name=?",
+                                            contentDescription = "My Avatar",
+                                            modifier = Modifier
+                                                .size(72.dp)
+                                                .clip(CircleShape)
+                                                .background(PremiumSurfaceVariant),
+                                            contentScale = ContentScale.Crop
+                                        )
+                                        Spacer(modifier = Modifier.width(24.dp))
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = "Total Bal: ₹${String.format("%.2f", myBalance)}",
+                                                fontSize = 20.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color.White
                                             )
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                            Column {
-                                                Text(firstName, color = TextPrimary, fontSize = 14.sp)
-                                                Text("-₹${String.format("%.2f", debt.amount)}", color = ErrorRed, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                            Spacer(modifier = Modifier.height(12.dp))
+                                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                                Column {
+                                                    Text("will get", color = TextSecondary, fontSize = 14.sp)
+                                                    Spacer(modifier = Modifier.height(4.dp))
+                                                    Text("₹${String.format("%.2f", totalWillGet)}", color = SuccessGreen, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                                                }
+                                                Column(horizontalAlignment = Alignment.End) {
+                                                    Text("will pay", color = TextSecondary, fontSize = 14.sp)
+                                                    Spacer(modifier = Modifier.height(4.dp))
+                                                    Text("₹${String.format("%.2f", totalWillPay)}", color = ErrorRed, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                                                }
                                             }
                                         }
-                                        Spacer(modifier = Modifier.height(12.dp))
                                     }
                                 }
                             }
@@ -427,18 +365,152 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
                     }
                 }
             }
-            Spacer(modifier = Modifier.height(24.dp))
 
-            Text("Your Books", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
-            Spacer(modifier = Modifier.height(16.dp))
-
-            val sessionBalances by viewModel.sessionBalances.collectAsState()
-
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.weight(1f)
+            // Collapsible Mid Section
+            AnimatedVisibility(
+                visible = !isScrolled,
+                enter = expandVertically(animationSpec = androidx.compose.animation.core.tween(300)) + androidx.compose.animation.fadeIn(animationSpec = androidx.compose.animation.core.tween(300)),
+                exit = shrinkVertically(animationSpec = androidx.compose.animation.core.tween(300)) + androidx.compose.animation.fadeOut(animationSpec = androidx.compose.animation.core.tween(300))
             ) {
-                items(allSessions) { s ->
+                Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    AnimatedContent(
+                    targetState = session,
+                    transitionSpec = {
+                        fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(300))
+                    },
+                    label = "session_animation_credit_debt"
+                ) { targetSession ->
+                    if (targetSession == null) {
+                        Row(modifier = Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Box(modifier = Modifier.width(80.dp).height(24.dp).shimmerEffect())
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Box(modifier = Modifier.fillMaxWidth().height(60.dp).clip(RoundedCornerShape(12.dp)).shimmerEffect())
+                            }
+                            Column(modifier = Modifier.weight(1f)) {
+                                Box(modifier = Modifier.width(80.dp).height(24.dp).shimmerEffect())
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Box(modifier = Modifier.fillMaxWidth().height(60.dp).clip(RoundedCornerShape(12.dp)).shimmerEffect())
+                            }
+                        }
+                    } else {
+                        Column {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            if (myCredits.isEmpty() && myDebts.isEmpty()) {
+                                val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.no_history))
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 16.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    LottieAnimation(
+                                        composition = composition,
+                                        iterations = LottieConstants.IterateForever,
+                                        modifier = Modifier.size(200.dp)
+                                    )
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    Text(
+                                        text = "All settled up!",
+                                        color = TextSecondary,
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                            } else {
+                                val membersList = sessionMembers.values.toList()
+                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                                    // Left Column (Credits / Owes You)
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text("Credit", color = SuccessGreen, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                                        HorizontalDivider(color = SuccessGreen, modifier = Modifier.padding(vertical = 8.dp))
+                                        if (myCredits.isEmpty()) {
+                                            Text("No credits", color = TextSecondary, fontSize = 14.sp)
+                                        } else {
+                                            myCredits.forEach { debt ->
+                                                val debtor = sessionMembers[debt.fromUid]
+                                                val firstName = debtor?.name?.split(" ")?.firstOrNull() ?: "Unknown"
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    AsyncImage(
+                                                        model = debtor?.photoUrl?.ifEmpty { "https://ui-avatars.com/api/?name=$firstName" } ?: "https://ui-avatars.com/api/?name=?",
+                                                        contentDescription = "Avatar",
+                                                        modifier = Modifier
+                                                            .size(32.dp)
+                                                            .clip(CircleShape)
+                                                            .background(PremiumSurfaceVariant),
+                                                        contentScale = ContentScale.Crop
+                                                    )
+                                                    Spacer(modifier = Modifier.width(8.dp))
+                                                    Column {
+                                                        Text(firstName, color = TextPrimary, fontSize = 14.sp)
+                                                        Text("+₹${String.format("%.2f", debt.amount)}", color = SuccessGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                                    }
+                                                }
+                                                Spacer(modifier = Modifier.height(12.dp))
+                                            }
+                                        }
+                                    }
+                                    
+                                    // Right Column (Debts / You Owe)
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text("Debt", color = ErrorRed, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                                        HorizontalDivider(color = ErrorRed, modifier = Modifier.padding(vertical = 8.dp))
+                                        if (myDebts.isEmpty()) {
+                                            Text("No debts", color = TextSecondary, fontSize = 14.sp)
+                                        } else {
+                                            myDebts.forEach { debt ->
+                                                val creditor = sessionMembers[debt.toUid]
+                                                val firstName = creditor?.name?.split(" ")?.firstOrNull() ?: "Unknown"
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    AsyncImage(
+                                                        model = creditor?.photoUrl?.ifEmpty { "https://ui-avatars.com/api/?name=$firstName" } ?: "https://ui-avatars.com/api/?name=?",
+                                                        contentDescription = "Avatar",
+                                                        modifier = Modifier
+                                                            .size(32.dp)
+                                                            .clip(CircleShape)
+                                                            .background(PremiumSurfaceVariant),
+                                                        contentScale = ContentScale.Crop
+                                                    )
+                                                    Spacer(modifier = Modifier.width(8.dp))
+                                                    Column {
+                                                        Text(firstName, color = TextPrimary, fontSize = 14.sp)
+                                                        Text("-₹${String.format("%.2f", debt.amount)}", color = ErrorRed, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                                    }
+                                                }
+                                                Spacer(modifier = Modifier.height(12.dp))
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            } // End of AnimatedContent
+            } // End of Column
+
+            // Scrollable list below the fixed card
+            LazyColumn(
+                state = listState,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp),
+                contentPadding = PaddingValues(bottom = 80.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+            stickyHeader {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(PremiumBackground)
+                        .padding(vertical = 12.dp)
+                ) {
+                    Text("Your Books", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
+
+            items(allSessions) { s ->
                     val balances = sessionBalances[s.id] ?: Pair(0.0, 0.0)
                     BookItem(
                         session = s,
@@ -656,9 +728,8 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
             containerColor = PremiumSurface
         )
     }
-    } // Closes Scaffold
-} // Closes ModalNavigationDrawer
-// Closes DashboardScreen
+    } // Closes ModalNavigationDrawer
+} // Closes DashboardScreen
 @Composable
 fun BookItem(
     session: Session,

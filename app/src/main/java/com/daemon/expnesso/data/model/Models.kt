@@ -17,7 +17,9 @@ data class Session(
     val inviteCode: String = "",
     val memberUids: List<String> = emptyList(),
     val createdAt: Timestamp = Timestamp.now(),
-    val isDeleted: Boolean = false,
+    @get:com.google.firebase.firestore.PropertyName("isDeleted")
+    @set:com.google.firebase.firestore.PropertyName("isDeleted")
+    var isDeleted: Boolean = false,
     val deletedAt: Timestamp? = null
 )
 
