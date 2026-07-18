@@ -20,6 +20,7 @@ import kotlinx.coroutines.launch
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -271,6 +272,7 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(24.dp))
                                     .background(Brush.linearGradient(colors = listOf(PremiumSurfaceVariant, PremiumSurface)))
+                                    .clickable { navController.navigate("book_details/${targetSession.id}") }
                             ) {
                                 Column(modifier = Modifier.padding(24.dp)) {
                                     Row(
@@ -355,6 +357,55 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
                                                     Text("will pay", color = TextSecondary, fontSize = 14.sp)
                                                     Spacer(modifier = Modifier.height(4.dp))
                                                     Text("₹${String.format("%.2f", totalWillPay)}", color = ErrorRed, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    val membersList = sessionMembers.values.toList()
+                                    if (membersList.isNotEmpty()) {
+                                        Spacer(modifier = Modifier.height(20.dp))
+                                        val displayMembers = membersList.take(4)
+                                        val remainingCount = membersList.size - 4
+
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Text("Members:", color = TextSecondary, fontSize = 14.sp)
+                                            Spacer(modifier = Modifier.width(12.dp))
+                                            Box(contentAlignment = Alignment.CenterStart) {
+                                                displayMembers.forEachIndexed { index, user ->
+                                                    val firstName = user.name.split(" ").firstOrNull() ?: "Unknown"
+                                                    AsyncImage(
+                                                        model = user.photoUrl.ifEmpty { "https://ui-avatars.com/api/?name=$firstName" },
+                                                        contentDescription = "Member Avatar",
+                                                        modifier = Modifier
+                                                            .padding(start = (index * 24).dp)
+                                                            .size(32.dp)
+                                                            .clip(CircleShape)
+                                                            .border(2.dp, PremiumSurfaceVariant, CircleShape)
+                                                            .background(PremiumSurface),
+                                                        contentScale = ContentScale.Crop
+                                                    )
+                                                }
+                                                if (remainingCount > 0) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .padding(start = (displayMembers.size * 24).dp)
+                                                            .size(32.dp)
+                                                            .clip(CircleShape)
+                                                            .border(2.dp, PremiumSurfaceVariant, CircleShape)
+                                                            .background(PrimaryAccent),
+                                                        contentAlignment = Alignment.Center
+                                                    ) {
+                                                        Text(
+                                                            text = "+$remainingCount",
+                                                            color = Color.Black,
+                                                            fontSize = 12.sp,
+                                                            fontWeight = FontWeight.Bold
+                                                        )
+                                                    }
                                                 }
                                             }
                                         }
