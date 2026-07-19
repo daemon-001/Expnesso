@@ -11,6 +11,9 @@ import com.daemon.expnesso.data.repository.FirestoreRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.launch
 
 class DashboardViewModel(
@@ -46,6 +49,11 @@ class DashboardViewModel(
     private val _myDebts = MutableStateFlow<List<Debt>>(emptyList())
     val myDebts: StateFlow<List<Debt>> = _myDebts
 
+    private val _allUserTransactionsMap = MutableStateFlow<Map<String, List<Transaction>>>(emptyMap())
+    val allUserTransactions: StateFlow<List<Transaction>> = _allUserTransactionsMap
+        .map { it.values.flatten().sortedByDescending { tx -> tx.timestamp } }
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
     private val _totalSpent = MutableStateFlow(0.0)
     val totalSpent: StateFlow<Double> = _totalSpent
 
@@ -68,9 +76,20 @@ class DashboardViewModel(
 
     fun loadAllSessions() {
         viewModelScope.launch {
+            val user = try { firestoreRepository.getUser(currentUserId) } catch (e: Exception) { null }
+            val defaultSessionId = user?.defaultSessionId
+            
             firestoreRepository.getUserSessions(currentUserId).collect { sessions ->
                 _allSessions.value = sessions
                 calculateAllSessionBalances(sessions)
+                
+                if (_currentSessionId.value.isBlank() && sessions.isNotEmpty()) {
+                    if (defaultSessionId != null && sessions.any { it.id == defaultSessionId }) {
+                        switchSession(defaultSessionId)
+                    } else {
+                        switchSession(sessions.first().id)
+                    }
+                }
             }
         }
     }
@@ -173,6 +192,7 @@ class DashboardViewModel(
                 sessionBalanceJobs.remove(id)
                 _sessionBalances.value = _sessionBalances.value - id
                 _sessionUserExpenses.value = _sessionUserExpenses.value - id
+                _allUserTransactionsMap.value = _allUserTransactionsMap.value - id
             }
         }
         
@@ -228,8 +248,13 @@ class DashboardViewModel(
                         val willGet = allDebts.filter { it.toUid == currentUserId }.sumOf { it.amount }
                         val willPay = allDebts.filter { it.fromUid == currentUserId }.sumOf { it.amount }
                         
+                        val userTxs = txList.filter { tx -> 
+                            (tx.paidByUid.ifEmpty { tx.addedByUid }) == currentUserId || tx.splits.containsKey(currentUserId) 
+                        }
+                        
                         _sessionBalances.value = _sessionBalances.value + (session.id to Pair(willGet, willPay))
                         _sessionUserExpenses.value = _sessionUserExpenses.value + (session.id to sessionUserExpense)
+                        _allUserTransactionsMap.value = _allUserTransactionsMap.value + (session.id to userTxs)
                     }
                 }
             }

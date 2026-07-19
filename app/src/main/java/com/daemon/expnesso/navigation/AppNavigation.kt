@@ -14,6 +14,7 @@ sealed class Screen(val route: String) {
     object BookDetails : Screen("book_details/{sessionId}") {
         fun createRoute(sessionId: String) = "book_details/$sessionId"
     }
+    object ExpenseHistory : Screen("expense_history")
 }
 
 @Composable
@@ -21,8 +22,13 @@ fun AppNavigation() {
     val navController = rememberNavController()
     var sharedDashboardViewModel: com.daemon.expnesso.ui.dashboard.DashboardViewModel? = null
     
-    // Default to Login for now, we will handle auth state later
-    NavHost(navController = navController, startDestination = Screen.Login.route) {
+    val startDestination = if (com.google.firebase.auth.FirebaseAuth.getInstance().currentUser != null) {
+        Screen.Dashboard.createRoute("")
+    } else {
+        Screen.Login.route
+    }
+    
+    NavHost(navController = navController, startDestination = startDestination) {
         composable(Screen.Login.route) {
             com.daemon.expnesso.ui.login.LoginScreen(navController)
         }
@@ -51,6 +57,11 @@ fun AppNavigation() {
             val sessionId = backStackEntry.arguments?.getString("sessionId") ?: ""
             sharedDashboardViewModel?.let { vm ->
                 com.daemon.expnesso.ui.dashboard.BookDetailsScreen(navController, vm, sessionId)
+            }
+        }
+        composable(Screen.ExpenseHistory.route) {
+            sharedDashboardViewModel?.let { vm ->
+                com.daemon.expnesso.ui.dashboard.ExpenseHistoryScreen(navController, vm)
             }
         }
     }

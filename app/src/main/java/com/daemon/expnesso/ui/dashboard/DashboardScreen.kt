@@ -33,6 +33,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.automirrored.filled.List
@@ -331,44 +333,65 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
             val globalTotalExpense = sessionUserExpenses.values.sum()
             val globalNetBalance = sessionBalances.values.sumOf { it.first - it.second }
 
-            Column(
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalAlignment = Alignment.Start
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text(
-                    text = "Total Expense",
-                    fontSize = 14.sp,
-                    color = TextSecondary,
-                    fontWeight = FontWeight.Medium
-                )
-                Text(
-                    text = "₹${com.daemon.expnesso.utils.FormatUtils.formatAmount(globalTotalExpense)}",
-                    fontSize = 36.sp,
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold
-                )
-                
-                val (globalBalanceText, globalBalanceColor) = when {
-                    globalNetBalance > 0 -> "+₹${com.daemon.expnesso.utils.FormatUtils.formatAmount(globalNetBalance)}" to SuccessGreen
-                    globalNetBalance < 0 -> "-₹${com.daemon.expnesso.utils.FormatUtils.formatAmount(-globalNetBalance)}" to ErrorRed
-                    else -> "Settled" to TextSecondary
+                Column(
+                    modifier = Modifier.weight(1f),
+                    horizontalAlignment = Alignment.Start
+                ) {
+                    Text(
+                        text = "Total Expense",
+                        fontSize = 14.sp,
+                        color = TextSecondary,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Text(
+                        text = "₹${com.daemon.expnesso.utils.FormatUtils.formatAmount(globalTotalExpense)}",
+                        fontSize = 36.sp,
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold
+                    )
+                    
+                    val (globalBalanceText, globalBalanceColor) = when {
+                        globalNetBalance > 0 -> "+₹${com.daemon.expnesso.utils.FormatUtils.formatAmount(globalNetBalance)}" to SuccessGreen
+                        globalNetBalance < 0 -> "-₹${com.daemon.expnesso.utils.FormatUtils.formatAmount(-globalNetBalance)}" to ErrorRed
+                        else -> "Settled" to TextSecondary
+                    }
+                    
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = buildAnnotatedString {
+                            withStyle(style = SpanStyle(color = TextSecondary)) {
+                                append("Current: ")
+                            }
+                            withStyle(style = SpanStyle(color = globalBalanceColor)) {
+                                append(globalBalanceText)
+                            }
+                        },
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium
+                    )
                 }
                 
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = buildAnnotatedString {
-                        withStyle(style = SpanStyle(color = TextSecondary)) {
-                            append("Current: ")
-                        }
-                        withStyle(style = SpanStyle(color = globalBalanceColor)) {
-                            append(globalBalanceText)
-                        }
-                    },
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium
-                )
+                Spacer(modifier = Modifier.width(16.dp))
+                
+                Row(
+                    modifier = Modifier
+                        .clip(androidx.compose.foundation.shape.RoundedCornerShape(24.dp))
+                        .clickable { navController.navigate("expense_history") }
+                        .background(PremiumSurfaceVariant)
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.List, contentDescription = "Expense History", tint = Color.White, modifier = Modifier.size(18.dp))
+                    Text("History", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                }
             }
             Spacer(modifier = Modifier.height(8.dp))
 
@@ -467,56 +490,61 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
                                             }
                                         }
                                     }
-                                    Spacer(modifier = Modifier.height(20.dp))
+                                    Spacer(modifier = Modifier.height(24.dp))
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         AsyncImage(
                                             model = currentUser?.photoUrl?.ifEmpty { "https://ui-avatars.com/api/?name=${currentUser?.name}" } ?: "https://ui-avatars.com/api/?name=?",
                                             contentDescription = "My Avatar",
                                             modifier = Modifier
-                                                .size(72.dp)
-                                                .clip(CircleShape)
+                                                .size(64.dp)
+                                                .clip(androidx.compose.foundation.shape.CircleShape)
                                                 .background(PremiumSurfaceVariant),
-                                            contentScale = ContentScale.Crop
+                                            contentScale = androidx.compose.ui.layout.ContentScale.Crop
                                         )
-                                        Spacer(modifier = Modifier.width(24.dp))
+                                        Spacer(modifier = Modifier.width(16.dp))
                                         Column(modifier = Modifier.weight(1f)) {
                                             val currentUserExpense = sessionUserExpenses[targetSession.id] ?: 0.0
                                             Text(
-                                                text = "Expense: ₹${com.daemon.expnesso.utils.FormatUtils.formatAmount(currentUserExpense)}",
-                                                fontSize = 20.sp,
+                                                text = "Your Expense",
+                                                color = TextSecondary,
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.Medium
+                                            )
+                                            Text(
+                                                text = "₹${com.daemon.expnesso.utils.FormatUtils.formatAmount(currentUserExpense)}",
+                                                fontSize = 26.sp,
                                                 fontWeight = FontWeight.Bold,
                                                 color = Color.White,
                                                 maxLines = 1,
                                                 overflow = TextOverflow.Ellipsis
                                             )
-                                            Spacer(modifier = Modifier.height(12.dp))
-                                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                                Column(modifier = Modifier.weight(1f).padding(end = 4.dp)) {
-                                                    Text("will get", color = TextSecondary, fontSize = 14.sp)
-                                                    Spacer(modifier = Modifier.height(4.dp))
-                                                    Text("₹${com.daemon.expnesso.utils.FormatUtils.formatAmount(totalWillGet)}", color = SuccessGreen, fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                                }
-                                                Column(horizontalAlignment = Alignment.End, modifier = Modifier.weight(1f).padding(start = 4.dp)) {
-                                                    Text("will pay", color = TextSecondary, fontSize = 14.sp)
-                                                    Spacer(modifier = Modifier.height(4.dp))
-                                                    Text("₹${com.daemon.expnesso.utils.FormatUtils.formatAmount(totalWillPay)}", color = ErrorRed, fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                                }
-                                            }
                                         }
                                     }
 
-                                    val membersList = sessionMembers.values.toList()
-                                    if (membersList.isNotEmpty()) {
-                                        Spacer(modifier = Modifier.height(20.dp))
-                                        val displayMembers = membersList.take(4)
-                                        val remainingCount = membersList.size - 4
+                                    Spacer(modifier = Modifier.height(24.dp))
+                                    
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.Bottom
+                                    ) {
+                                        Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                                            Column {
+                                                Text("Will get", color = TextSecondary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                                                Spacer(modifier = Modifier.height(4.dp))
+                                                Text("₹${com.daemon.expnesso.utils.FormatUtils.formatAmount(totalWillGet)}", color = SuccessGreen, fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                            }
+                                            Column {
+                                                Text("Will pay", color = TextSecondary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                                                Spacer(modifier = Modifier.height(4.dp))
+                                                Text("₹${com.daemon.expnesso.utils.FormatUtils.formatAmount(totalWillPay)}", color = ErrorRed, fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                            }
+                                        }
 
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            modifier = Modifier.fillMaxWidth()
-                                        ) {
-                                            Text("Members:", color = TextSecondary, fontSize = 14.sp)
-                                            Spacer(modifier = Modifier.width(12.dp))
+                                        val membersList = sessionMembers.values.toList()
+                                        if (membersList.isNotEmpty()) {
+                                            val displayMembers = membersList.take(3)
+                                            val remainingCount = membersList.size - 3
                                             Box(contentAlignment = Alignment.CenterStart) {
                                                 displayMembers.forEachIndexed { index, user ->
                                                     val firstName = user.name.split(" ").firstOrNull() ?: "Unknown"
@@ -524,28 +552,28 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
                                                         model = user.photoUrl.ifEmpty { "https://ui-avatars.com/api/?name=$firstName" },
                                                         contentDescription = "Member Avatar",
                                                         modifier = Modifier
-                                                            .padding(start = (index * 24).dp)
+                                                            .padding(start = (index * 20).dp)
                                                             .size(32.dp)
-                                                            .clip(CircleShape)
-                                                            .border(2.dp, PremiumSurfaceVariant, CircleShape)
-                                                            .background(PremiumSurface),
-                                                        contentScale = ContentScale.Crop
+                                                            .clip(androidx.compose.foundation.shape.CircleShape)
+                                                            .border(2.dp, PremiumSurface, androidx.compose.foundation.shape.CircleShape)
+                                                            .background(PremiumSurfaceVariant),
+                                                        contentScale = androidx.compose.ui.layout.ContentScale.Crop
                                                     )
                                                 }
                                                 if (remainingCount > 0) {
                                                     Box(
                                                         modifier = Modifier
-                                                            .padding(start = (displayMembers.size * 24).dp)
+                                                            .padding(start = (displayMembers.size * 20).dp)
                                                             .size(32.dp)
-                                                            .clip(CircleShape)
-                                                            .border(2.dp, PremiumSurfaceVariant, CircleShape)
+                                                            .clip(androidx.compose.foundation.shape.CircleShape)
+                                                            .border(2.dp, PremiumSurface, androidx.compose.foundation.shape.CircleShape)
                                                             .background(PrimaryAccent),
                                                         contentAlignment = Alignment.Center
                                                     ) {
                                                         Text(
                                                             text = "+$remainingCount",
                                                             color = Color.Black,
-                                                            fontSize = 12.sp,
+                                                            fontSize = 11.sp,
                                                             fontWeight = FontWeight.Bold
                                                         )
                                                     }
