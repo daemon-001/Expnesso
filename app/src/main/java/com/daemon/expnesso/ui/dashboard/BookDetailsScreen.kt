@@ -14,7 +14,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -25,6 +29,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -57,6 +64,8 @@ fun BookDetailsScreen(
     val netBalances by viewModel.netBalances.collectAsState()
     val transactions by viewModel.transactions.collectAsState()
     val totalSpent = transactions.sumOf { it.amount }
+    val sessionUserExpenses by viewModel.sessionUserExpenses.collectAsState()
+    val myExpense = sessionUserExpenses[sessionId] ?: 0.0
     var showAddExpenseDialog by remember { mutableStateOf(false) }
     var showInviteDialog by remember { mutableStateOf(false) }
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
@@ -83,11 +92,28 @@ fun BookDetailsScreen(
             return@Scaffold
         }
 
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(horizontal = 24.dp),
+        @OptIn(ExperimentalMaterial3Api::class)
+        val pullRefreshState = rememberPullToRefreshState()
+        var isRefreshing by remember { mutableStateOf(false) }
+        
+        LaunchedEffect(session) {
+            isRefreshing = false
+        }
+
+        @OptIn(ExperimentalMaterial3Api::class)
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = { 
+                isRefreshing = true
+                viewModel.switchSession(sessionId) 
+            },
+            state = pullRefreshState,
+            modifier = Modifier.padding(padding).fillMaxSize()
+        ) {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 24.dp),
             contentPadding = PaddingValues(bottom = 24.dp)
         ) {
             item {
@@ -136,7 +162,7 @@ fun BookDetailsScreen(
                             fontSize = 12.sp
                         )
                         
-                        Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(16.dp))
                         
                         Surface(
                             color = PremiumSurfaceVariant,
@@ -169,7 +195,7 @@ fun BookDetailsScreen(
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(24.dp))
+                        Spacer(modifier = Modifier.height(16.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -179,12 +205,24 @@ fun BookDetailsScreen(
                                 Text("Total Book Expenses", color = TextSecondary, fontSize = 14.sp)
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
-                                    text = "₹${String.format("%.2f", totalSpent)}",
+                                    text = "₹${com.daemon.expnesso.utils.FormatUtils.formatAmount(totalSpent)}",
                                     color = Color.White,
                                     fontSize = 36.sp,
                                     fontWeight = FontWeight.Black,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = buildAnnotatedString {
+                                        append("Your Expense: ")
+                                        withStyle(style = SpanStyle(color = Color.White)) {
+                                            append("₹${com.daemon.expnesso.utils.FormatUtils.formatAmount(myExpense)}")
+                                        }
+                                    },
+                                    color = TextSecondary,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium
                                 )
                             }
                             
@@ -282,6 +320,7 @@ fun BookDetailsScreen(
                 Spacer(modifier = Modifier.height(12.dp))
             }
         }
+        } // End PullToRefreshBox
 
         if (showAddExpenseDialog) {
             val isGroup = sessionMembers.size > 1
@@ -506,7 +545,7 @@ fun BalanceBarChart(netBalances: Map<String, Double>, members: Map<String, User>
                         modifier = Modifier.weight(1f).padding(end = 8.dp)
                     )
                     Text(
-                        text = "${if (isPositive) "+" else "-"}₹${String.format("%.0f", Math.abs(balance))}",
+                        text = "${if (isPositive) "+" else "-"}₹${com.daemon.expnesso.utils.FormatUtils.formatAmount(Math.abs(balance))}",
                         color = barColor,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
@@ -599,7 +638,7 @@ fun MemberBalanceCard(member: User, balance: Double, isAdmin: Boolean) {
                 if (balance > 0) {
                     Text("Gets Back", color = SuccessGreen, fontSize = 12.sp)
                     Text(
-                        "+₹${String.format("%.2f", balance)}", 
+                        "+₹${com.daemon.expnesso.utils.FormatUtils.formatAmount(balance)}", 
                         color = SuccessGreen, 
                         fontSize = 16.sp, 
                         fontWeight = FontWeight.Bold,
@@ -609,7 +648,7 @@ fun MemberBalanceCard(member: User, balance: Double, isAdmin: Boolean) {
                 } else if (balance < 0) {
                     Text("Owes", color = ErrorRed, fontSize = 12.sp)
                     Text(
-                        "-₹${String.format("%.2f", Math.abs(balance))}", 
+                        "-₹${com.daemon.expnesso.utils.FormatUtils.formatAmount(Math.abs(balance))}", 
                         color = ErrorRed, 
                         fontSize = 16.sp, 
                         fontWeight = FontWeight.Bold,

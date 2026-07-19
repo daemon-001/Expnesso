@@ -14,9 +14,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -59,6 +62,24 @@ fun TransactionsScreen(navController: NavController, viewModel: DashboardViewMod
             )
         }
     ) { padding ->
+        @OptIn(ExperimentalMaterial3Api::class)
+        val pullRefreshState = rememberPullToRefreshState()
+        var isRefreshing by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+        
+        androidx.compose.runtime.LaunchedEffect(transactions) {
+            isRefreshing = false
+        }
+
+        @OptIn(ExperimentalMaterial3Api::class)
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = { 
+                isRefreshing = true
+                session?.id?.let { viewModel.switchSession(it) } ?: run { isRefreshing = false }
+            },
+            state = pullRefreshState,
+            modifier = Modifier.padding(padding).fillMaxSize()
+        ) {
         Column(
             modifier = Modifier
                 .padding(padding)
@@ -70,11 +91,6 @@ fun TransactionsScreen(navController: NavController, viewModel: DashboardViewMod
                 modifier = Modifier.weight(1f)
             ) {
                 items(transactions) { tx ->
-                    AnimatedVisibility(
-                        visible = true,
-                        enter = fadeIn(animationSpec = tween(500)),
-                        exit = fadeOut(animationSpec = tween(500))
-                    ) {
                         TransactionItem(
                             transaction = tx,
                             paidBy = sessionMembers[tx.paidByUid.ifEmpty { tx.addedByUid }],
@@ -84,9 +100,9 @@ fun TransactionsScreen(navController: NavController, viewModel: DashboardViewMod
                                 viewModel.deleteTransaction(tx.id, session?.adminUid ?: "", tx.addedByUid)
                             }
                         )
-                    }
                 }
             }
+        }
         }
     }
 }
@@ -128,7 +144,7 @@ fun TransactionItem(
                 Text("${sdf.format(transaction.timestamp.toDate())} • Paid by ${paidBy?.name ?: "Unknown"}", color = TextSecondary, fontSize = 12.sp)
             }
             Text(
-                text = "₹${String.format("%.2f", transaction.amount)}",
+                text = "₹${com.daemon.expnesso.utils.FormatUtils.formatAmount(transaction.amount)}",
                 color = Color.White,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold

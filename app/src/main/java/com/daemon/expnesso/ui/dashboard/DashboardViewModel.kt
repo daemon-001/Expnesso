@@ -53,6 +53,10 @@ class DashboardViewModel(
     private val _sessionBalances = MutableStateFlow<Map<String, Pair<Double, Double>>>(emptyMap())
     val sessionBalances: StateFlow<Map<String, Pair<Double, Double>>> = _sessionBalances
 
+    // Map of sessionId -> Double (user expense)
+    private val _sessionUserExpenses = MutableStateFlow<Map<String, Double>>(emptyMap())
+    val sessionUserExpenses: StateFlow<Map<String, Double>> = _sessionUserExpenses
+
     private var sessionJob: Job? = null
     private var transactionsJob: Job? = null
     private val sessionBalanceJobs = mutableMapOf<String, Job>()
@@ -62,7 +66,7 @@ class DashboardViewModel(
         switchSession(initialSessionId)
     }
 
-    private fun loadAllSessions() {
+    fun loadAllSessions() {
         viewModelScope.launch {
             firestoreRepository.getUserSessions(currentUserId).collect { sessions ->
                 _allSessions.value = sessions
@@ -168,6 +172,7 @@ class DashboardViewModel(
                 sessionBalanceJobs[id]?.cancel()
                 sessionBalanceJobs.remove(id)
                 _sessionBalances.value = _sessionBalances.value - id
+                _sessionUserExpenses.value = _sessionUserExpenses.value - id
             }
         }
         
@@ -179,6 +184,8 @@ class DashboardViewModel(
                         val balances = mutableMapOf<String, Double>()
                         session.memberUids.forEach { balances[it] = 0.0 }
                         
+                        var sessionUserExpense = 0.0
+
                         txList.forEach { tx ->
                             val paidBy = tx.paidByUid.ifEmpty { tx.addedByUid }
                             balances[paidBy] = (balances[paidBy] ?: 0.0) + tx.amount
@@ -187,8 +194,12 @@ class DashboardViewModel(
                                 tx.splits.forEach { (uid, amountOwed) ->
                                     balances[uid] = (balances[uid] ?: 0.0) - amountOwed
                                 }
+                                sessionUserExpense += tx.splits[currentUserId] ?: 0.0
                             } else {
                                 balances[paidBy] = (balances[paidBy] ?: 0.0) - tx.amount
+                                if (paidBy == currentUserId) {
+                                    sessionUserExpense += tx.amount
+                                }
                             }
                         }
                         
@@ -218,6 +229,7 @@ class DashboardViewModel(
                         val willPay = allDebts.filter { it.fromUid == currentUserId }.sumOf { it.amount }
                         
                         _sessionBalances.value = _sessionBalances.value + (session.id to Pair(willGet, willPay))
+                        _sessionUserExpenses.value = _sessionUserExpenses.value + (session.id to sessionUserExpense)
                     }
                 }
             }

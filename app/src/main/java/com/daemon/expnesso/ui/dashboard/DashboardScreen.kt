@@ -18,6 +18,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import kotlinx.coroutines.launch
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -53,6 +54,9 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -109,10 +113,26 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
 
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
+    var backPressedTime by remember { mutableLongStateOf(0L) }
+    val activity = context as? android.app.Activity
+
+    BackHandler(enabled = drawerState.isOpen) {
+        scope.launch { drawerState.close() }
+    }
+
+    BackHandler(enabled = drawerState.isClosed) {
+        val currentTime = System.currentTimeMillis()
+        if (currentTime - backPressedTime < 2000) {
+            activity?.finish()
+        } else {
+            Toast.makeText(context, "Press back again to exit", Toast.LENGTH_SHORT).show()
+            backPressedTime = currentTime
+        }
+    }
 
     ModalNavigationDrawer(
         drawerState = drawerState,
-        gesturesEnabled = false,
+        gesturesEnabled = drawerState.isOpen,
         drawerContent = {
             ModalDrawerSheet(
                 drawerContainerColor = PremiumSurface,
@@ -238,6 +258,7 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
         }
     ) { padding ->
         val sessionBalances by viewModel.sessionBalances.collectAsState()
+        val sessionUserExpenses by viewModel.sessionUserExpenses.collectAsState()
         val myCredits by viewModel.myCredits.collectAsState()
         val myDebts by viewModel.myDebts.collectAsState()
         val currentUser = sessionMembers[viewModel.currentUserId]
@@ -306,21 +327,60 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
                 .fillMaxSize()
                 .nestedScroll(nestedScrollConnection)
         ) {
+
+            val globalTotalExpense = sessionUserExpenses.values.sum()
+            val globalNetBalance = sessionBalances.values.sumOf { it.first - it.second }
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalAlignment = Alignment.Start
+            ) {
+                Text(
+                    text = "Total Expense",
+                    fontSize = 14.sp,
+                    color = TextSecondary,
+                    fontWeight = FontWeight.Medium
+                )
+                Text(
+                    text = "₹${com.daemon.expnesso.utils.FormatUtils.formatAmount(globalTotalExpense)}",
+                    fontSize = 36.sp,
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold
+                )
+                
+                val (globalBalanceText, globalBalanceColor) = when {
+                    globalNetBalance > 0 -> "+₹${com.daemon.expnesso.utils.FormatUtils.formatAmount(globalNetBalance)}" to SuccessGreen
+                    globalNetBalance < 0 -> "-₹${com.daemon.expnesso.utils.FormatUtils.formatAmount(-globalNetBalance)}" to ErrorRed
+                    else -> "Settled" to TextSecondary
+                }
+                
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = buildAnnotatedString {
+                        withStyle(style = SpanStyle(color = TextSecondary)) {
+                            append("Current: ")
+                        }
+                        withStyle(style = SpanStyle(color = globalBalanceColor)) {
+                            append(globalBalanceText)
+                        }
+                    },
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+
             // Dashboard Card fixed at the top
             Box(modifier = Modifier.padding(horizontal = 16.dp)) {
-                AnimatedContent(
-                    targetState = session,
-                    transitionSpec = {
-                        fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(300))
-                    },
-                    label = "session_animation_header"
-                ) { targetSession ->
-                    if (targetSession == null) {
-                        Column(modifier = Modifier.background(PremiumBackground)) {
-                            Box(modifier = Modifier.fillMaxWidth().height(150.dp).clip(RoundedCornerShape(24.dp)).shimmerEffect())
-                        }
-                    } else {
-                        Column(modifier = Modifier.background(PremiumBackground)) {
+                val targetSession = session
+                if (targetSession == null) {
+                    Column(modifier = Modifier.background(PremiumBackground)) {
+                        Box(modifier = Modifier.fillMaxWidth().height(150.dp).clip(RoundedCornerShape(24.dp)).shimmerEffect())
+                    }
+                } else {
+                    Column(modifier = Modifier.background(PremiumBackground)) {
                             // Premium Summary Card
                             Box(
                                 modifier = Modifier
@@ -420,8 +480,9 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
                                         )
                                         Spacer(modifier = Modifier.width(24.dp))
                                         Column(modifier = Modifier.weight(1f)) {
+                                            val currentUserExpense = sessionUserExpenses[targetSession.id] ?: 0.0
                                             Text(
-                                                text = "Total Bal: ₹${String.format("%.2f", myBalance)}",
+                                                text = "Expense: ₹${com.daemon.expnesso.utils.FormatUtils.formatAmount(currentUserExpense)}",
                                                 fontSize = 20.sp,
                                                 fontWeight = FontWeight.Bold,
                                                 color = Color.White,
@@ -433,12 +494,12 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
                                                 Column(modifier = Modifier.weight(1f).padding(end = 4.dp)) {
                                                     Text("will get", color = TextSecondary, fontSize = 14.sp)
                                                     Spacer(modifier = Modifier.height(4.dp))
-                                                    Text("₹${String.format("%.2f", totalWillGet)}", color = SuccessGreen, fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                                    Text("₹${com.daemon.expnesso.utils.FormatUtils.formatAmount(totalWillGet)}", color = SuccessGreen, fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                                 }
                                                 Column(horizontalAlignment = Alignment.End, modifier = Modifier.weight(1f).padding(start = 4.dp)) {
                                                     Text("will pay", color = TextSecondary, fontSize = 14.sp)
                                                     Spacer(modifier = Modifier.height(4.dp))
-                                                    Text("₹${String.format("%.2f", totalWillPay)}", color = ErrorRed, fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                                    Text("₹${com.daemon.expnesso.utils.FormatUtils.formatAmount(totalWillPay)}", color = ErrorRed, fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                                 }
                                             }
                                         }
@@ -494,16 +555,26 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
                                     }
                                 }
                             }
+                                }
+                            }
                         }
-                    }
-                }
-            }
+
 
             // Collapsible Mid Section
-            AnimatedVisibility(
-                visibleState = headerState,
-                enter = expandVertically(animationSpec = androidx.compose.animation.core.tween(300)) + androidx.compose.animation.fadeIn(animationSpec = androidx.compose.animation.core.tween(300)),
-                exit = shrinkVertically(animationSpec = androidx.compose.animation.core.tween(300)) + androidx.compose.animation.fadeOut(animationSpec = androidx.compose.animation.core.tween(300))
+            androidx.compose.animation.AnimatedVisibility(
+                visible = headerState.targetState,
+                enter = androidx.compose.animation.expandVertically(
+                    animationSpec = androidx.compose.animation.core.spring(
+                        dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy,
+                        stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow
+                    )
+                ),
+                exit = androidx.compose.animation.shrinkVertically(
+                    animationSpec = androidx.compose.animation.core.spring(
+                        dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy,
+                        stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow
+                    )
+                )
             ) {
                 Column(modifier = Modifier
                     .padding(horizontal = 16.dp)
@@ -516,13 +587,8 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
                     }
                 ) {
                     Spacer(modifier = Modifier.height(12.dp))
-                    AnimatedContent(
-                    targetState = session,
-                    transitionSpec = {
-                        fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(300))
-                    },
-                    label = "session_animation_credit_debt"
-                ) { targetSession ->
+                    val targetSession = session
+
                     if (targetSession == null) {
                         Row(modifier = Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                             Column(modifier = Modifier.weight(1f)) {
@@ -586,7 +652,7 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
                                                     Spacer(modifier = Modifier.width(8.dp))
                                                     Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
                                                         Text(firstName, color = TextPrimary, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                                        Text("+₹${String.format("%.2f", debt.amount)}", color = SuccessGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                                        Text("+₹${com.daemon.expnesso.utils.FormatUtils.formatAmount(debt.amount)}", color = SuccessGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                                     }
                                                 }
                                                 Spacer(modifier = Modifier.height(12.dp))
@@ -617,20 +683,19 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
                                                     Spacer(modifier = Modifier.width(8.dp))
                                                     Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
                                                         Text(firstName, color = TextPrimary, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                                        Text("-₹${String.format("%.2f", debt.amount)}", color = ErrorRed, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                                        Text("-₹${com.daemon.expnesso.utils.FormatUtils.formatAmount(debt.amount)}", color = ErrorRed, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                                     }
                                                 }
                                                 Spacer(modifier = Modifier.height(12.dp))
                                             }
                                         }
                                     }
-                                }
                             }
                         }
                     }
                 }
-            } // End of AnimatedContent
-            } // End of Column
+            }
+                }
 
             // Scrollable list below the fixed card
             LazyColumn(
@@ -653,18 +718,20 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
             }
 
             items(allSessions) { s ->
-                    val balances = sessionBalances[s.id] ?: Pair(0.0, 0.0)
-                    BookItem(
-                        session = s,
-                        willGet = balances.first,
-                        willPay = balances.second,
-                        isSelected = s.id == session?.id,
-                        isDefault = s.id == currentUser?.defaultSessionId,
-                        onClick = { viewModel.switchSession(s.id) }
-                    )
-                }
+                val balances = sessionBalances[s.id] ?: Pair(0.0, 0.0)
+                BookItem(
+                    session = s,
+                    expense = sessionUserExpenses[s.id] ?: 0.0,
+                    willGet = balances.first,
+                    willPay = balances.second,
+                    isSelected = s.id == session?.id,
+                    isDefault = s.id == currentUser?.defaultSessionId,
+                    onClick = { viewModel.switchSession(s.id) }
+                )
             }
-        }
+            }
+        } // End of Column
+    }
     }
 
     if (showAddExpenseDialog) {
@@ -952,11 +1019,11 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
             containerColor = PremiumSurface
         )
     }
-    } // Closes ModalNavigationDrawer
-} // Closes DashboardScreen
+} // Closes ModalNavigationDrawer
 @Composable
 fun BookItem(
     session: Session,
+    expense: Double,
     willGet: Double,
     willPay: Double,
     isSelected: Boolean,
@@ -982,8 +1049,15 @@ fun BookItem(
                 Text(session.name, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Spacer(modifier = Modifier.height(4.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Get: +₹${String.format("%.2f", willGet)}", color = SuccessGreen, fontSize = 14.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text("Pay: -₹${String.format("%.2f", willPay)}", color = ErrorRed, fontSize = 14.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text("Expense: ₹${com.daemon.expnesso.utils.FormatUtils.formatAmount(expense)}", color = TextSecondary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                    
+                    if (willGet > 0) {
+                        Text("| Get: +₹${com.daemon.expnesso.utils.FormatUtils.formatAmount(willGet)}", color = SuccessGreen, fontSize = 14.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f, fill = false), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    } else if (willPay > 0) {
+                        Text("| Pay: -₹${com.daemon.expnesso.utils.FormatUtils.formatAmount(willPay)}", color = ErrorRed, fontSize = 14.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f, fill = false), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    } else {
+                        Text("| Settled", color = TextSecondary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                    }
                 }
             }
             if (isDefault) {
