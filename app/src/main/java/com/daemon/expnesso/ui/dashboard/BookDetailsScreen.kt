@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -39,6 +40,10 @@ import com.daemon.expnesso.data.model.User
 import com.daemon.expnesso.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.Locale
+import android.widget.Toast
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.foundation.Image
+import com.daemon.expnesso.utils.QRCodeUtils
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -52,6 +57,10 @@ fun BookDetailsScreen(
     val netBalances by viewModel.netBalances.collectAsState()
     val transactions by viewModel.transactions.collectAsState()
     val totalSpent = transactions.sumOf { it.amount }
+    var showAddExpenseDialog by remember { mutableStateOf(false) }
+    var showInviteDialog by remember { mutableStateOf(false) }
+    var showDeleteConfirmDialog by remember { mutableStateOf(false) }
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     Scaffold(
         topBar = {
@@ -91,36 +100,123 @@ fun BookDetailsScreen(
                         .background(Brush.linearGradient(colors = listOf(PremiumSurfaceVariant, PremiumSurface)))
                 ) {
                     Column(modifier = Modifier.padding(24.dp)) {
-                        Text(
-                            text = session!!.name,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White,
-                            fontSize = 26.sp,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis
-                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.Top
+                        ) {
+                            Text(
+                                text = session!!.name,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White,
+                                fontSize = 26.sp,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f)
+                            )
+                            if (session!!.adminUid == viewModel.currentUserId) {
+                                IconButton(
+                                    onClick = { 
+                                        showDeleteConfirmDialog = true
+                                    },
+                                    modifier = Modifier
+                                        .background(ErrorRed.copy(alpha = 0.2f), CircleShape)
+                                        .size(36.dp)
+                                ) {
+                                    Icon(Icons.Filled.Delete, contentDescription = "Delete Book", tint = ErrorRed, modifier = Modifier.size(20.dp))
+                                }
+                            }
+                        }
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "Invite Code: ${session!!.inviteCode}",
-                            color = TextSecondary,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Medium
-                        )
+                        
                         val sdf = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault())
                         Text(
-                            text = "Created: ${sdf.format(session!!.createdAt.toDate())}",
+                            text = "Created ${sdf.format(session!!.createdAt.toDate())}",
                             color = TextSecondary,
-                            fontSize = 14.sp
+                            fontSize = 12.sp
                         )
+                        
+                        Spacer(modifier = Modifier.height(12.dp))
+                        
+                        Surface(
+                            color = PremiumSurfaceVariant,
+                            shape = RoundedCornerShape(8.dp),
+                            onClick = {
+                                val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                val clip = android.content.ClipData.newPlainText("Invite Code", session!!.inviteCode)
+                                clipboard.setPrimaryClip(clip)
+                                android.widget.Toast.makeText(context, "Code copied to clipboard", android.widget.Toast.LENGTH_SHORT).show()
+                            }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Invite Code: ${session!!.inviteCode}",
+                                    color = PrimaryAccent,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 1.sp
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Icon(
+                                    imageVector = Icons.Filled.ContentCopy,
+                                    contentDescription = "Copy Code",
+                                    tint = PrimaryAccent,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
 
                         Spacer(modifier = Modifier.height(24.dp))
-                        Text("Total Book Expenses", color = TextSecondary, fontSize = 14.sp)
-                        Text(
-                            text = "₹${String.format("%.2f", totalSpent)}",
-                            color = PrimaryAccent,
-                            fontSize = 32.sp,
-                            fontWeight = FontWeight.Black
-                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.Bottom
+                        ) {
+                            Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                                Text("Total Book Expenses", color = TextSecondary, fontSize = 14.sp)
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "₹${String.format("%.2f", totalSpent)}",
+                                    color = Color.White,
+                                    fontSize = 36.sp,
+                                    fontWeight = FontWeight.Black,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                IconButton(
+                                    onClick = { showInviteDialog = true },
+                                    modifier = Modifier
+                                        .background(PremiumSurfaceVariant, CircleShape)
+                                        .size(40.dp)
+                                ) {
+                                    Icon(Icons.Filled.PersonAdd, contentDescription = "Add Member", tint = Color.White)
+                                }
+                                Spacer(modifier = Modifier.width(12.dp))
+                                IconButton(
+                                    onClick = { navController.navigate("transactions") },
+                                    modifier = Modifier
+                                        .background(PremiumSurfaceVariant, CircleShape)
+                                        .size(40.dp)
+                                ) {
+                                    Icon(Icons.Filled.List, contentDescription = "Transactions", tint = Color.White)
+                                }
+                                Spacer(modifier = Modifier.width(12.dp))
+                                IconButton(
+                                    onClick = { showAddExpenseDialog = true },
+                                    modifier = Modifier
+                                        .background(PrimaryAccent, CircleShape)
+                                        .size(40.dp)
+                                ) {
+                                    Icon(Icons.Filled.Add, contentDescription = "Add Expense", tint = Color.White)
+                                }
+                            }
+                        }
                     }
                 }
                 Spacer(modifier = Modifier.height(32.dp))
@@ -159,7 +255,7 @@ fun BookDetailsScreen(
                     )
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Custom Bar Chart for balances
+                    // Improved Bar Chart for balances
                     if (netBalances.isNotEmpty()) {
                         BalanceBarChart(netBalances = netBalances, members = sessionMembers)
                         Spacer(modifier = Modifier.height(32.dp))
@@ -186,73 +282,259 @@ fun BookDetailsScreen(
                 Spacer(modifier = Modifier.height(12.dp))
             }
         }
+
+        if (showAddExpenseDialog) {
+            val isGroup = sessionMembers.size > 1
+            AddTransactionDialog(
+                sessionMembers = sessionMembers.values.toList(),
+                currentUserId = viewModel.currentUserId,
+                isGroup = isGroup,
+                onDismiss = { showAddExpenseDialog = false },
+                onAdd = { amount, desc, paidByUid, splits ->
+                    viewModel.addTransaction(amount, desc, paidByUid, splits) {
+                        showAddExpenseDialog = false
+                    }
+                }
+            )
+        }
+        
+        if (showDeleteConfirmDialog) {
+            AlertDialog(
+                onDismissRequest = { showDeleteConfirmDialog = false },
+                title = { Text("Delete Book", color = ErrorRed, fontWeight = FontWeight.Bold) },
+                text = {
+                    Text(
+                        text = "Are you sure you want to delete this book? This will move it to the bin, and you can restore it within 30 days.",
+                        color = TextPrimary
+                    )
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            showDeleteConfirmDialog = false
+                            viewModel.deleteSession(
+                                sessionId = session!!.id, 
+                                adminUid = session!!.adminUid,
+                                onSuccess = {
+                                    navController.navigate("session_management") {
+                                        popUpTo(0)
+                                    }
+                                },
+                                onError = { err -> 
+                                    android.widget.Toast.makeText(context, err, android.widget.Toast.LENGTH_SHORT).show()
+                                }
+                            )
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = ErrorRed)
+                    ) {
+                        Text("Delete", color = Color.White)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showDeleteConfirmDialog = false }) {
+                        Text("Cancel", color = TextSecondary)
+                    }
+                },
+                containerColor = PremiumSurface
+            )
+        }
+
+        if (showInviteDialog) {
+            var isAddingManual by remember { mutableStateOf(false) }
+            var manualName by remember { mutableStateOf("") }
+            var qrBitmap by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
+            
+            LaunchedEffect(session?.inviteCode) {
+                session?.inviteCode?.let { code ->
+                    qrBitmap = QRCodeUtils.generateQRCode(code)
+                }
+            }
+
+            AlertDialog(
+                onDismissRequest = { showInviteDialog = false },
+                title = {
+                    Text(
+                        text = "Invite to ${session!!.name}",
+                        color = TextPrimary,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                },
+                text = {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                        Text("Share this code or scan the QR", color = TextSecondary, fontSize = 14.sp)
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        if (qrBitmap != null) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(Color.White)
+                                    .padding(12.dp)
+                            ) {
+                                Image(
+                                    bitmap = qrBitmap!!.asImageBitmap(),
+                                    contentDescription = "QR Code",
+                                    modifier = Modifier.size(150.dp)
+                                )
+                            }
+                        }
+                        
+                        Spacer(modifier = Modifier.height(16.dp))
+                        
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(PremiumSurfaceVariant)
+                                .padding(horizontal = 16.dp, vertical = 8.dp)
+                        ) {
+                            Text(
+                                text = session!!.inviteCode,
+                                fontSize = 24.sp,
+                                fontWeight = FontWeight.Black,
+                                color = PrimaryAccent,
+                                letterSpacing = 4.sp
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(24.dp))
+                        HorizontalDivider(color = PremiumSurfaceVariant)
+                        Spacer(modifier = Modifier.height(16.dp))
+                        
+                        Text("Or add offline member", color = TextSecondary, fontSize = 14.sp)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        OutlinedTextField(
+                            value = manualName,
+                            onValueChange = { manualName = it },
+                            placeholder = { Text("Enter member name", color = TextSecondary.copy(alpha = 0.5f)) },
+                            singleLine = true,
+                            shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = PrimaryAccent,
+                                unfocusedBorderColor = PremiumSurfaceVariant,
+                                focusedTextColor = TextPrimary,
+                                unfocusedTextColor = TextPrimary
+                            ),
+                            modifier = Modifier.fillMaxWidth(),
+                            trailingIcon = {
+                                if (isAddingManual) {
+                                    androidx.compose.material3.CircularProgressIndicator(
+                                        modifier = Modifier.size(20.dp),
+                                        color = PrimaryAccent,
+                                        strokeWidth = 2.dp
+                                    )
+                                } else {
+                                    IconButton(
+                                        onClick = {
+                                            isAddingManual = true
+                                            viewModel.addManualMember(
+                                                name = manualName,
+                                                onSuccess = {
+                                                    isAddingManual = false
+                                                    manualName = ""
+                                                    Toast.makeText(context, "Added successfully", Toast.LENGTH_SHORT).show()
+                                                },
+                                                onError = {
+                                                    isAddingManual = false
+                                                    Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
+                                                }
+                                            )
+                                        },
+                                        enabled = manualName.isNotBlank()
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Add,
+                                            contentDescription = "Add Member",
+                                            tint = if (manualName.isNotBlank()) PrimaryAccent else TextSecondary.copy(alpha = 0.5f)
+                                        )
+                                    }
+                                }
+                            }
+                        )
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { showInviteDialog = false }) {
+                        Text("Close", color = TextSecondary)
+                    }
+                },
+                containerColor = PremiumSurface,
+                shape = RoundedCornerShape(24.dp)
+            )
+        }
     }
 }
 
 @Composable
 fun BalanceBarChart(netBalances: Map<String, Double>, members: Map<String, User>) {
-    // Only show people with non-zero balances for the chart, or show all? Let's show top 5 for simplicity or all if small
     val chartData = netBalances.toList().sortedByDescending { it.second }
-    val maxAbsBalance = chartData.maxOfOrNull { Math.abs(it.second) }?.toFloat() ?: 1f
+    val maxAbsBalance = chartData.maxOfOrNull { Math.abs(it.second) }?.takeIf { it > 0.0 } ?: 1.0
 
-    val animationProgress = remember { Animatable(0f) }
-    LaunchedEffect(chartData) {
-        animationProgress.animateTo(1f, animationSpec = tween(1000, easing = FastOutSlowInEasing))
-    }
-
-    Canvas(modifier = Modifier.fillMaxWidth().height((chartData.size * 60).dp)) {
-        val width = size.width
-        val barHeight = 24.dp.toPx()
-        val spacing = 36.dp.toPx()
-        val centerLine = width / 2f
-        val maxBarWidth = (width / 2f) - 30.dp.toPx()
-
-        chartData.forEachIndexed { index, (uid, balance) ->
-            val yOffset = index * spacing + spacing / 2
+    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        chartData.forEach { (uid, balance) ->
             val member = members[uid]
             val name = member?.name?.split(" ")?.firstOrNull() ?: "Unknown"
-
-            // Calculate bar dimensions
-            val normalizedAbsBalance = (Math.abs(balance).toFloat() / maxAbsBalance) * maxBarWidth * animationProgress.value
             val isPositive = balance >= 0
-            
             val barColor = if (isPositive) SuccessGreen else ErrorRed
-            val barStartX = if (isPositive) centerLine else centerLine - normalizedAbsBalance
-            val barWidth = normalizedAbsBalance
+            val fraction = (Math.abs(balance) / maxAbsBalance).toFloat()
 
-            drawRoundRect(
-                color = barColor,
-                topLeft = Offset(barStartX, yOffset - barHeight / 2),
-                size = Size(barWidth, barHeight),
-                cornerRadius = CornerRadius(4.dp.toPx(), 4.dp.toPx())
-            )
-
-            // Draw text
-            val paint = android.graphics.Paint().apply {
-                color = android.graphics.Color.WHITE
-                textSize = 12.sp.toPx()
-                textAlign = if (isPositive) android.graphics.Paint.Align.RIGHT else android.graphics.Paint.Align.LEFT
-                isAntiAlias = true
+            var animationProgress by remember { mutableStateOf(0f) }
+            LaunchedEffect(fraction) {
+                androidx.compose.animation.core.animate(
+                    initialValue = 0f,
+                    targetValue = fraction,
+                    animationSpec = tween(1000, easing = FastOutSlowInEasing)
+                ) { value, _ ->
+                    animationProgress = value
+                }
             }
 
-            val textX = if (isPositive) centerLine - 10.dp.toPx() else centerLine + 10.dp.toPx()
-            
-            drawContext.canvas.nativeCanvas.drawText(
-                "$name: ₹${String.format("%.0f", balance)}",
-                textX,
-                yOffset + (paint.textSize / 3), // vertical centering approximation
-                paint
-            )
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        name, 
+                        color = TextPrimary, 
+                        fontSize = 14.sp, 
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f).padding(end = 8.dp)
+                    )
+                    Text(
+                        text = "${if (isPositive) "+" else "-"}₹${String.format("%.0f", Math.abs(balance))}",
+                        color = barColor,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(8.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(PremiumSurfaceVariant)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(animationProgress)
+                            .height(8.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(barColor)
+                    )
+                }
+            }
         }
-        
-        // Draw center zero line
-        drawLine(
-            color = TextSecondary.copy(alpha = 0.5f),
-            start = Offset(centerLine, 0f),
-            end = Offset(centerLine, size.height),
-            strokeWidth = 2f
-        )
     }
+
+
 }
 
 @Composable
@@ -276,9 +558,17 @@ fun MemberBalanceCard(member: User, balance: Double, isAdmin: Boolean) {
                 contentScale = ContentScale.Crop
             )
             Spacer(modifier = Modifier.width(16.dp))
-            Column(modifier = Modifier.weight(1f)) {
+            Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(member.name, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    Text(
+                        member.name, 
+                        color = Color.White, 
+                        fontSize = 16.sp, 
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
                     if (isAdmin) {
                         Spacer(modifier = Modifier.width(8.dp))
                         Surface(
@@ -296,16 +586,36 @@ fun MemberBalanceCard(member: User, balance: Double, isAdmin: Boolean) {
                     }
                 }
                 Spacer(modifier = Modifier.height(4.dp))
-                Text(member.email, color = TextSecondary, fontSize = 12.sp)
+                Text(
+                    member.email, 
+                    color = TextSecondary, 
+                    fontSize = 12.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
             
-            Column(horizontalAlignment = Alignment.End) {
+            Column(horizontalAlignment = Alignment.End, modifier = Modifier.widthIn(max = 120.dp)) {
                 if (balance > 0) {
                     Text("Gets Back", color = SuccessGreen, fontSize = 12.sp)
-                    Text("+₹${String.format("%.2f", balance)}", color = SuccessGreen, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    Text(
+                        "+₹${String.format("%.2f", balance)}", 
+                        color = SuccessGreen, 
+                        fontSize = 16.sp, 
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 } else if (balance < 0) {
                     Text("Owes", color = ErrorRed, fontSize = 12.sp)
-                    Text("-₹${String.format("%.2f", Math.abs(balance))}", color = ErrorRed, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    Text(
+                        "-₹${String.format("%.2f", Math.abs(balance))}", 
+                        color = ErrorRed, 
+                        fontSize = 16.sp, 
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 } else {
                     Text("Settled", color = TextSecondary, fontSize = 12.sp)
                     Text("₹0.00", color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)

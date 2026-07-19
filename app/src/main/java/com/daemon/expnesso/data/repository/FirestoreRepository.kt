@@ -63,6 +63,10 @@ class FirestoreRepository {
         return sessionId
     }
 
+    suspend fun deleteSession(sessionId: String) {
+        db.collection("sessions").document(sessionId).delete().await()
+    }
+
     suspend fun joinSession(inviteCode: String, uid: String): String? {
         val snapshot = db.collection("sessions")
             .whereEqualTo("inviteCode", inviteCode)

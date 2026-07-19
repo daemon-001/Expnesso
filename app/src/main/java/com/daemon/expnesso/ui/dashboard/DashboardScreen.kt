@@ -424,19 +424,21 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
                                                 text = "Total Bal: ₹${String.format("%.2f", myBalance)}",
                                                 fontSize = 20.sp,
                                                 fontWeight = FontWeight.Bold,
-                                                color = Color.White
+                                                color = Color.White,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
                                             )
                                             Spacer(modifier = Modifier.height(12.dp))
                                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                                Column {
+                                                Column(modifier = Modifier.weight(1f).padding(end = 4.dp)) {
                                                     Text("will get", color = TextSecondary, fontSize = 14.sp)
                                                     Spacer(modifier = Modifier.height(4.dp))
-                                                    Text("₹${String.format("%.2f", totalWillGet)}", color = SuccessGreen, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                                                    Text("₹${String.format("%.2f", totalWillGet)}", color = SuccessGreen, fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                                 }
-                                                Column(horizontalAlignment = Alignment.End) {
+                                                Column(horizontalAlignment = Alignment.End, modifier = Modifier.weight(1f).padding(start = 4.dp)) {
                                                     Text("will pay", color = TextSecondary, fontSize = 14.sp)
                                                     Spacer(modifier = Modifier.height(4.dp))
-                                                    Text("₹${String.format("%.2f", totalWillPay)}", color = ErrorRed, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                                                    Text("₹${String.format("%.2f", totalWillPay)}", color = ErrorRed, fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                                 }
                                             }
                                         }
@@ -582,9 +584,9 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
                                                         contentScale = ContentScale.Crop
                                                     )
                                                     Spacer(modifier = Modifier.width(8.dp))
-                                                    Column {
-                                                        Text(firstName, color = TextPrimary, fontSize = 14.sp)
-                                                        Text("+₹${String.format("%.2f", debt.amount)}", color = SuccessGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                                    Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                                                        Text(firstName, color = TextPrimary, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                                        Text("+₹${String.format("%.2f", debt.amount)}", color = SuccessGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                                     }
                                                 }
                                                 Spacer(modifier = Modifier.height(12.dp))
@@ -613,9 +615,9 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
                                                         contentScale = ContentScale.Crop
                                                     )
                                                     Spacer(modifier = Modifier.width(8.dp))
-                                                    Column {
-                                                        Text(firstName, color = TextPrimary, fontSize = 14.sp)
-                                                        Text("-₹${String.format("%.2f", debt.amount)}", color = ErrorRed, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                                    Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                                                        Text(firstName, color = TextPrimary, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                                        Text("-₹${String.format("%.2f", debt.amount)}", color = ErrorRed, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                                     }
                                                 }
                                                 Spacer(modifier = Modifier.height(12.dp))
@@ -925,6 +927,7 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
                         session?.let { currentSession ->
                             viewModel.deleteSession(
                                 sessionId = currentSession.id,
+                                adminUid = currentSession.adminUid,
                                 onSuccess = {
                                     Toast.makeText(context, "Book moved to bin", Toast.LENGTH_SHORT).show()
                                     showDeleteBookDialog = false
@@ -976,11 +979,11 @@ fun BookItem(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(session.name, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Text(session.name, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Spacer(modifier = Modifier.height(4.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Text("Get: +₹${String.format("%.2f", willGet)}", color = SuccessGreen, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                    Text("Pay: -₹${String.format("%.2f", willPay)}", color = ErrorRed, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Get: +₹${String.format("%.2f", willGet)}", color = SuccessGreen, fontSize = 14.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text("Pay: -₹${String.format("%.2f", willPay)}", color = ErrorRed, fontSize = 14.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
             if (isDefault) {

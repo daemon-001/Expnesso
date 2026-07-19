@@ -247,6 +247,8 @@ class DashboardViewModel(
         }
     }
 
+
+
     fun createSession(name: String, onSuccess: (String) -> Unit) {
         if (name.isBlank()) return
         viewModelScope.launch {
@@ -298,16 +300,22 @@ class DashboardViewModel(
         }
     }
 
-    fun deleteSession(sessionId: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
+    fun deleteSession(sessionId: String, adminUid: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
+        if (currentUserId != adminUid) {
+            onError("You are not the admin of this book.")
+            return
+        }
         viewModelScope.launch {
             try {
                 firestoreRepository.softDeleteSession(sessionId)
                 
+                val remaining = allSessions.value.filter { it.id != sessionId }
+                val newDefaultId = remaining.firstOrNull()?.id ?: ""
+                
                 // If the deleted session was the current one, switch to the first available session or clear
                 if (currentSessionId.value == sessionId) {
-                    val remaining = allSessions.value.filter { it.id != sessionId }
-                    if (remaining.isNotEmpty()) {
-                        switchSession(remaining.first().id)
+                    if (newDefaultId.isNotEmpty()) {
+                        switchSession(newDefaultId)
                     } else {
                         _session.value = null
                         _transactions.value = emptyList()
@@ -317,6 +325,21 @@ class DashboardViewModel(
                         _myDebts.value = emptyList()
                     }
                 }
+                
+                // Update default session if it was the deleted one
+                val user = firestoreRepository.getUser(currentUserId)
+                if (user?.defaultSessionId == sessionId) {
+                    firestoreRepository.setDefaultSession(currentUserId, newDefaultId)
+                    val me = _sessionMembers.value[currentUserId]
+                    if (me != null && me.defaultSessionId == sessionId) {
+                        _sessionMembers.value = _sessionMembers.value.toMutableMap().apply {
+                            put(currentUserId, me.copy(defaultSessionId = newDefaultId))
+                        }
+                    }
+                }
+                
+                _allSessions.value = remaining
+                
                 onSuccess()
             } catch (e: Exception) {
                 onError(e.message ?: "Failed to delete book")
