@@ -66,7 +66,6 @@ fun BookDetailsScreen(
     val totalSpent = transactions.sumOf { it.amount }
     val sessionUserExpenses by viewModel.sessionUserExpenses.collectAsState()
     val myExpense = sessionUserExpenses[sessionId] ?: 0.0
-    var showAddExpenseDialog by remember { mutableStateOf(false) }
     var showInviteDialog by remember { mutableStateOf(false) }
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -246,7 +245,7 @@ fun BookDetailsScreen(
                                 }
                                 Spacer(modifier = Modifier.width(12.dp))
                                 IconButton(
-                                    onClick = { showAddExpenseDialog = true },
+                                    onClick = { navController.navigate(com.daemon.expnesso.navigation.Screen.AddExpense.route) },
                                     modifier = Modifier
                                         .background(PrimaryAccent, CircleShape)
                                         .size(40.dp)
@@ -322,21 +321,6 @@ fun BookDetailsScreen(
         }
         } // End PullToRefreshBox
 
-        if (showAddExpenseDialog) {
-            val isGroup = sessionMembers.size > 1
-            AddTransactionDialog(
-                sessionMembers = sessionMembers.values.toList(),
-                currentUserId = viewModel.currentUserId,
-                isGroup = isGroup,
-                onDismiss = { showAddExpenseDialog = false },
-                onAdd = { amount, desc, paidByUid, splits ->
-                    viewModel.addTransaction(amount, desc, paidByUid, splits) {
-                        showAddExpenseDialog = false
-                    }
-                }
-            )
-        }
-        
         if (showDeleteConfirmDialog) {
             AlertDialog(
                 onDismissRequest = { showDeleteConfirmDialog = false },

@@ -51,8 +51,7 @@ fun LoginScreen(navController: NavController) {
             val userDoc = firestoreRepository.getUser(currentUser.uid)
             var targetSessionId = userDoc?.defaultSessionId
             if (targetSessionId.isNullOrEmpty()) {
-                targetSessionId = firestoreRepository.createSession("Personal Expenses", currentUser.uid)
-                firestoreRepository.setDefaultSession(currentUser.uid, targetSessionId)
+                targetSessionId = ""
             }
             navController.navigate(Screen.Dashboard.createRoute(targetSessionId)) {
                 popUpTo(Screen.Login.route) { inclusive = true }
@@ -78,8 +77,7 @@ fun LoginScreen(navController: NavController) {
                             val userDoc = firestoreRepository.getUser(firebaseUser.uid)
                             var targetSessionId = userDoc?.defaultSessionId
                             if (targetSessionId.isNullOrEmpty()) {
-                                targetSessionId = firestoreRepository.createSession("Personal Expenses", firebaseUser.uid)
-                                firestoreRepository.setDefaultSession(firebaseUser.uid, targetSessionId)
+                                targetSessionId = ""
                             }
                             navController.navigate(Screen.Dashboard.createRoute(targetSessionId)) {
                                 popUpTo(Screen.Login.route) { inclusive = true }

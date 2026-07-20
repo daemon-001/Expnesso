@@ -29,6 +29,9 @@ class DashboardViewModel(
 
     private val _allSessions = MutableStateFlow<List<Session>>(emptyList())
     val allSessions: StateFlow<List<Session>> = _allSessions
+    
+    private val _isSessionsLoaded = MutableStateFlow(false)
+    val isSessionsLoaded: StateFlow<Boolean> = _isSessionsLoaded
 
     private val _session = MutableStateFlow<Session?>(null)
     val session: StateFlow<Session?> = _session
@@ -79,17 +82,22 @@ class DashboardViewModel(
             val user = try { firestoreRepository.getUser(currentUserId) } catch (e: Exception) { null }
             val defaultSessionId = user?.defaultSessionId
             
-            firestoreRepository.getUserSessions(currentUserId).collect { sessions ->
-                _allSessions.value = sessions
-                calculateAllSessionBalances(sessions)
-                
-                if (_currentSessionId.value.isBlank() && sessions.isNotEmpty()) {
-                    if (defaultSessionId != null && sessions.any { it.id == defaultSessionId }) {
-                        switchSession(defaultSessionId)
-                    } else {
-                        switchSession(sessions.first().id)
+            try {
+                firestoreRepository.getUserSessions(currentUserId).collect { sessions ->
+                    _allSessions.value = sessions
+                    calculateAllSessionBalances(sessions)
+                    
+                    if (_currentSessionId.value.isBlank() && sessions.isNotEmpty()) {
+                        if (defaultSessionId != null && sessions.any { it.id == defaultSessionId }) {
+                            switchSession(defaultSessionId)
+                        } else {
+                            switchSession(sessions.first().id)
+                        }
                     }
+                    _isSessionsLoaded.value = true
                 }
+            } catch (e: Exception) {
+                // Ignore flow cancellation or permission denied on logout
             }
         }
     }
@@ -101,24 +109,32 @@ class DashboardViewModel(
         transactionsJob?.cancel()
 
         sessionJob = viewModelScope.launch {
-            firestoreRepository.getSession(sessionId).collect { s ->
-                _session.value = s
-                if (s != null) {
-                    val members = firestoreRepository.getUsers(s.memberUids)
-                    _sessionMembers.value = members.associateBy { it.uid }
-                    calculateBalances()
+            try {
+                firestoreRepository.getSession(sessionId).collect { s ->
+                    _session.value = s
+                    if (s != null) {
+                        val members = try { firestoreRepository.getUsers(s.memberUids) } catch (e: Exception) { emptyList() }
+                        _sessionMembers.value = members.associateBy { it.uid }
+                        calculateBalances()
+                    }
                 }
+            } catch (e: Exception) {
+                // Ignore flow cancellation or permission denied on logout
             }
         }
         
         transactionsJob = viewModelScope.launch {
-            firestoreRepository.getSessionTransactions(sessionId).collect { txList ->
-                _transactions.value = txList
-                // Calculate total spent (just the sum of all transactions for simplicity, or sum of current user's splits)
-                // For a personal tracker, total spent is sum of amount.
-                // For a group tracker, we might want to show total group spending, or just user's spending. We'll show total group spending.
-                _totalSpent.value = txList.sumOf { it.amount }
-                calculateBalances()
+            try {
+                firestoreRepository.getSessionTransactions(sessionId).collect { txList ->
+                    _transactions.value = txList
+                    // Calculate total spent (just the sum of all transactions for simplicity, or sum of current user's splits)
+                    // For a personal tracker, total spent is sum of amount.
+                    // For a group tracker, we might want to show total group spending, or just user's spending. We'll show total group spending.
+                    _totalSpent.value = txList.sumOf { it.amount }
+                    calculateBalances()
+                }
+            } catch (e: Exception) {
+                // Ignore flow cancellation or permission denied on logout
             }
         }
     }
@@ -200,61 +216,65 @@ class DashboardViewModel(
         sessions.forEach { session ->
             if (session.id !in sessionBalanceJobs) {
                 sessionBalanceJobs[session.id] = viewModelScope.launch {
-                    firestoreRepository.getSessionTransactions(session.id).collect { txList ->
-                        val balances = mutableMapOf<String, Double>()
-                        session.memberUids.forEach { balances[it] = 0.0 }
-                        
-                        var sessionUserExpense = 0.0
+                    try {
+                        firestoreRepository.getSessionTransactions(session.id).collect { txList ->
+                            val balances = mutableMapOf<String, Double>()
+                            session.memberUids.forEach { balances[it] = 0.0 }
+                            
+                            var sessionUserExpense = 0.0
 
-                        txList.forEach { tx ->
-                            val paidBy = tx.paidByUid.ifEmpty { tx.addedByUid }
-                            balances[paidBy] = (balances[paidBy] ?: 0.0) + tx.amount
+                            txList.forEach { tx ->
+                                val paidBy = tx.paidByUid.ifEmpty { tx.addedByUid }
+                                balances[paidBy] = (balances[paidBy] ?: 0.0) + tx.amount
 
-                            if (tx.splits.isNotEmpty()) {
-                                tx.splits.forEach { (uid, amountOwed) ->
-                                    balances[uid] = (balances[uid] ?: 0.0) - amountOwed
-                                }
-                                sessionUserExpense += tx.splits[currentUserId] ?: 0.0
-                            } else {
-                                balances[paidBy] = (balances[paidBy] ?: 0.0) - tx.amount
-                                if (paidBy == currentUserId) {
-                                    sessionUserExpense += tx.amount
+                                if (tx.splits.isNotEmpty()) {
+                                    tx.splits.forEach { (uid, amountOwed) ->
+                                        balances[uid] = (balances[uid] ?: 0.0) - amountOwed
+                                    }
+                                    sessionUserExpense += tx.splits[currentUserId] ?: 0.0
+                                } else {
+                                    balances[paidBy] = (balances[paidBy] ?: 0.0) - tx.amount
+                                    if (paidBy == currentUserId) {
+                                        sessionUserExpense += tx.amount
+                                    }
                                 }
                             }
+                            
+                            val debtors = balances.filterValues { it < -0.01 }.mapValues { -it.value }.toMutableMap()
+                            val creditors = balances.filterValues { it > 0.01 }.toMutableMap()
+                            
+                            val allDebts = mutableListOf<Debt>()
+                            
+                            while (debtors.isNotEmpty() && creditors.isNotEmpty()) {
+                                val debtor = debtors.keys.first()
+                                val creditor = creditors.keys.first()
+                                
+                                val debtAmount = debtors[debtor]!!
+                                val creditAmount = creditors[creditor]!!
+                                
+                                val settledAmount = minOf(debtAmount, creditAmount)
+                                allDebts.add(Debt(debtor, creditor, settledAmount))
+                                
+                                debtors[debtor] = debtAmount - settledAmount
+                                creditors[creditor] = creditAmount - settledAmount
+                                
+                                if (debtors[debtor]!! < 0.01) debtors.remove(debtor)
+                                if (creditors[creditor]!! < 0.01) creditors.remove(creditor)
+                            }
+                            
+                            val willGet = allDebts.filter { it.toUid == currentUserId }.sumOf { it.amount }
+                            val willPay = allDebts.filter { it.fromUid == currentUserId }.sumOf { it.amount }
+                            
+                            val userTxs = txList.filter { tx -> 
+                                (tx.paidByUid.ifEmpty { tx.addedByUid }) == currentUserId || tx.splits.containsKey(currentUserId) 
+                            }
+                            
+                            _sessionBalances.value = _sessionBalances.value + (session.id to Pair(willGet, willPay))
+                            _sessionUserExpenses.value = _sessionUserExpenses.value + (session.id to sessionUserExpense)
+                            _allUserTransactionsMap.value = _allUserTransactionsMap.value + (session.id to userTxs)
                         }
-                        
-                        val debtors = balances.filterValues { it < -0.01 }.mapValues { -it.value }.toMutableMap()
-                        val creditors = balances.filterValues { it > 0.01 }.toMutableMap()
-                        
-                        val allDebts = mutableListOf<Debt>()
-                        
-                        while (debtors.isNotEmpty() && creditors.isNotEmpty()) {
-                            val debtor = debtors.keys.first()
-                            val creditor = creditors.keys.first()
-                            
-                            val debtAmount = debtors[debtor]!!
-                            val creditAmount = creditors[creditor]!!
-                            
-                            val settledAmount = minOf(debtAmount, creditAmount)
-                            allDebts.add(Debt(debtor, creditor, settledAmount))
-                            
-                            debtors[debtor] = debtAmount - settledAmount
-                            creditors[creditor] = creditAmount - settledAmount
-                            
-                            if (debtors[debtor]!! < 0.01) debtors.remove(debtor)
-                            if (creditors[creditor]!! < 0.01) creditors.remove(creditor)
-                        }
-                        
-                        val willGet = allDebts.filter { it.toUid == currentUserId }.sumOf { it.amount }
-                        val willPay = allDebts.filter { it.fromUid == currentUserId }.sumOf { it.amount }
-                        
-                        val userTxs = txList.filter { tx -> 
-                            (tx.paidByUid.ifEmpty { tx.addedByUid }) == currentUserId || tx.splits.containsKey(currentUserId) 
-                        }
-                        
-                        _sessionBalances.value = _sessionBalances.value + (session.id to Pair(willGet, willPay))
-                        _sessionUserExpenses.value = _sessionUserExpenses.value + (session.id to sessionUserExpense)
-                        _allUserTransactionsMap.value = _allUserTransactionsMap.value + (session.id to userTxs)
+                    } catch (e: Exception) {
+                        // Ignore
                     }
                 }
             }
@@ -290,6 +310,10 @@ class DashboardViewModel(
         if (name.isBlank()) return
         viewModelScope.launch {
             val newSessionId = firestoreRepository.createSession(name, currentUserId)
+            val user = try { firestoreRepository.getUser(currentUserId) } catch (e: Exception) { null }
+            if (user?.defaultSessionId.isNullOrEmpty()) {
+                setAsDefaultSession(newSessionId)
+            }
             switchSession(newSessionId)
             onSuccess(newSessionId)
         }
@@ -301,7 +325,10 @@ class DashboardViewModel(
             try {
                 val joinedSessionId = firestoreRepository.joinSession(inviteCode, currentUserId)
                 if (joinedSessionId != null) {
-                    loadAllSessions()
+                    val user = try { firestoreRepository.getUser(currentUserId) } catch (e: Exception) { null }
+                    if (user?.defaultSessionId.isNullOrEmpty()) {
+                        setAsDefaultSession(joinedSessionId)
+                    }
                     switchSession(joinedSessionId)
                     onSuccess()
                 } else {

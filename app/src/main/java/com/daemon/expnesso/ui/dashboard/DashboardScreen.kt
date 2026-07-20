@@ -93,11 +93,12 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
     val totalSpent by viewModel.totalSpent.collectAsState()
     val session by viewModel.session.collectAsState()
     val allSessions by viewModel.allSessions.collectAsState()
+    val isSessionsLoaded by viewModel.isSessionsLoaded.collectAsState()
+    val currentSessionId by viewModel.currentSessionId.collectAsState()
     val sessionMembers by viewModel.sessionMembers.collectAsState()
     val netBalances by viewModel.netBalances.collectAsState()
 
     // Dialog States
-    var showAddExpenseDialog by remember { mutableStateOf(false) }
     var fabExpanded by remember { mutableStateOf(false) }
     var showInviteDialog by remember { mutableStateOf(false) }
     var showCreateBookDialog by remember { mutableStateOf(false) }
@@ -221,7 +222,7 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
                             SmallFloatingActionButton(
                                 onClick = {
                                     fabExpanded = false
-                                    showAddExpenseDialog = true
+                                    navController.navigate(com.daemon.expnesso.navigation.Screen.AddExpense.route)
                                 },
                                 containerColor = PrimaryAccent,
                                 contentColor = Color.Black
@@ -399,8 +400,25 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
             Box(modifier = Modifier.padding(horizontal = 16.dp)) {
                 val targetSession = session
                 if (targetSession == null) {
-                    Column(modifier = Modifier.background(PremiumBackground)) {
-                        Box(modifier = Modifier.fillMaxWidth().height(150.dp).clip(RoundedCornerShape(24.dp)).shimmerEffect())
+                    if (isSessionsLoaded && allSessions.isEmpty() && currentSessionId.isBlank()) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(24.dp))
+                                .background(Brush.linearGradient(colors = listOf(PremiumSurfaceVariant, PremiumSurface)))
+                                .padding(32.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Icon(Icons.Default.Star, contentDescription = null, tint = PrimaryAccent, modifier = Modifier.size(48.dp))
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text("Welcome to Expnesso!", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text("Create or join a book to start tracking expenses.", color = TextSecondary, fontSize = 14.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                        }
+                    } else {
+                        Column(modifier = Modifier.background(PremiumBackground)) {
+                            Box(modifier = Modifier.fillMaxWidth().height(150.dp).clip(RoundedCornerShape(24.dp)).shimmerEffect())
+                        }
                     }
                 } else {
                     Column(modifier = Modifier.background(PremiumBackground)) {
@@ -435,7 +453,7 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
                                             )
                                         }
                                         Row(verticalAlignment = Alignment.CenterVertically) {
-                                            IconButton(onClick = { showAddExpenseDialog = true }) {
+                                            IconButton(onClick = { navController.navigate(com.daemon.expnesso.navigation.Screen.AddExpense.route) }) {
                                                 Icon(Icons.Default.Add, contentDescription = "Add Expense", tint = Color.White)
                                             }
                                             Box {
@@ -447,8 +465,8 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
                                                     onDismissRequest = { menuExpanded = false },
                                                     containerColor = PremiumSurface
                                                 ) {
-                                                    val isDefault = currentUser?.defaultSessionId == targetSession.id
-                                                    if (!isDefault) {
+                                                    val isDefaultBook = currentUser?.defaultSessionId == targetSession.id
+                                                    if (!isDefaultBook) {
                                                         DropdownMenuItem(
                                                             text = { Text("Set as Default", color = Color.White) },
                                                             onClick = {
@@ -760,21 +778,6 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
             }
         } // End of Column
     }
-    }
-
-    if (showAddExpenseDialog) {
-        val isGroup = sessionMembers.size > 1
-        AddTransactionDialog(
-            sessionMembers = sessionMembers.values.toList(),
-            currentUserId = viewModel.currentUserId,
-            isGroup = isGroup,
-            onDismiss = { showAddExpenseDialog = false },
-            onAdd = { amount, desc, paidByUid, splits ->
-                viewModel.addTransaction(amount, desc, paidByUid, splits) {
-                    showAddExpenseDialog = false
-                }
-            }
-        )
     }
 
     if (showInviteDialog && session != null) {
