@@ -11,6 +11,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -92,8 +93,10 @@ fun AddExpenseScreen(
                         value = amount,
                         onValueChange = { amount = it },
                         label = { Text("Amount (₹)", color = TextSecondary) },
+                        leadingIcon = { Text("₹", fontSize = 24.sp, color = TextPrimary, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 16.dp, end = 4.dp)) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
                         singleLine = true,
+                        textStyle = LocalTextStyle.current.copy(fontSize = 24.sp, fontWeight = FontWeight.Bold),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = TextPrimary,
                             unfocusedTextColor = TextPrimary,
@@ -102,7 +105,7 @@ fun AddExpenseScreen(
                             focusedContainerColor = PremiumSurface,
                             unfocusedContainerColor = PremiumSurface
                         ),
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().height(80.dp),
                         shape = RoundedCornerShape(16.dp)
                     )
                 }
@@ -136,12 +139,16 @@ fun AddExpenseScreen(
                         items(suggestions) { suggestion ->
                             Box(
                                 modifier = Modifier
-                                    .clip(RoundedCornerShape(20.dp))
+                                    .clip(RoundedCornerShape(16.dp))
                                     .background(PremiumSurfaceVariant)
                                     .clickable { description = suggestion }
-                                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                                    .padding(horizontal = 10.dp, vertical = 6.dp)
                             ) {
-                                Text(text = suggestion, color = TextPrimary, fontSize = 14.sp)
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Add, contentDescription = "Add", tint = TextPrimary, modifier = Modifier.size(14.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(text = suggestion, color = TextPrimary, fontSize = 12.sp)
+                                }
                             }
                         }
                     }
@@ -195,9 +202,10 @@ fun AddExpenseScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(48.dp)
-                                .clip(RoundedCornerShape(24.dp))
-                                .background(PremiumSurface),
+                                .height(56.dp)
+                                .clip(RoundedCornerShape(28.dp))
+                                .background(PremiumSurfaceVariant.copy(alpha = 0.5f))
+                                .padding(4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Box(
@@ -212,7 +220,8 @@ fun AddExpenseScreen(
                                 Text(
                                     "Split Equally", 
                                     color = if (!isCustomSplit) Color.Black else TextSecondary,
-                                    fontWeight = FontWeight.Bold
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 15.sp
                                 )
                             }
                             Box(
@@ -227,7 +236,8 @@ fun AddExpenseScreen(
                                 Text(
                                     "Split Custom", 
                                     color = if (isCustomSplit) Color.Black else TextSecondary,
-                                    fontWeight = FontWeight.Bold
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 15.sp
                                 )
                             }
                         }
@@ -291,16 +301,18 @@ fun AddExpenseScreen(
                                     onValueChange = { customAmounts[member.uid] = it },
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
                                     singleLine = true,
-                                    modifier = Modifier.width(100.dp).height(50.dp),
-                                    textStyle = LocalTextStyle.current.copy(textAlign = TextAlign.End),
+                                    placeholder = { Text("0", color = TextSecondary.copy(alpha = 0.5f), modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.End) },
+                                    modifier = Modifier.width(90.dp).height(50.dp),
+                                    textStyle = LocalTextStyle.current.copy(textAlign = TextAlign.End, fontSize = 16.sp, fontWeight = FontWeight.Bold),
                                     colors = OutlinedTextFieldDefaults.colors(
                                         focusedTextColor = TextPrimary,
                                         unfocusedTextColor = TextPrimary,
                                         focusedBorderColor = PrimaryAccent,
-                                        unfocusedBorderColor = PremiumSurfaceVariant,
-                                        focusedContainerColor = PremiumBackground,
-                                        unfocusedContainerColor = PremiumBackground
-                                    )
+                                        unfocusedBorderColor = PremiumSurfaceVariant.copy(alpha = 0.5f),
+                                        focusedContainerColor = PremiumSurfaceVariant.copy(alpha = 0.3f),
+                                        unfocusedContainerColor = PremiumSurfaceVariant.copy(alpha = 0.3f)
+                                    ),
+                                    shape = RoundedCornerShape(8.dp)
                                 )
                             }
                         }

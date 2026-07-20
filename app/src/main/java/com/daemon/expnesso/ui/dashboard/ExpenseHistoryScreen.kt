@@ -59,11 +59,12 @@ fun ExpenseHistoryScreen(navController: NavController, viewModel: DashboardViewM
                     Text("No expenses found.", color = Color.LightGray, fontSize = 18.sp)
                 }
             } else {
+                val sdf = androidx.compose.runtime.remember { SimpleDateFormat("MMM dd, yyyy • hh:mm a", Locale.getDefault()) }
                 LazyColumn(
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    items(allUserTransactions) { tx ->
+                    items(allUserTransactions, key = { it.id }) { tx ->
                         val session = allSessions.find { it.id == tx.sessionId }
                         val sessionName = session?.name ?: "Unknown Book"
                         
@@ -76,7 +77,7 @@ fun ExpenseHistoryScreen(navController: NavController, viewModel: DashboardViewM
                             if (tx.splits.isNotEmpty()) tx.splits[currentUserId] ?: 0.0 else 0.0
                         }
 
-                        val formattedDate = SimpleDateFormat("MMM dd, yyyy • hh:mm a", Locale.getDefault()).format(tx.timestamp.toDate())
+                        val formattedDate = sdf.format(tx.timestamp.toDate())
 
                         Card(
                             colors = CardDefaults.cardColors(containerColor = PremiumSurface),

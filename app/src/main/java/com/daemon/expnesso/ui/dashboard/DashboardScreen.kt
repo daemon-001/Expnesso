@@ -417,7 +417,7 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
                         }
                     } else {
                         Column(modifier = Modifier.background(PremiumBackground)) {
-                            Box(modifier = Modifier.fillMaxWidth().height(150.dp).clip(RoundedCornerShape(24.dp)).shimmerEffect())
+                            Box(modifier = Modifier.fillMaxWidth().height(220.dp).clip(RoundedCornerShape(24.dp)).shimmerEffect())
                         }
                     }
                 } else {
