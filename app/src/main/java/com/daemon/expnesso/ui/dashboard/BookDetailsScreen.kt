@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -51,7 +52,7 @@ import android.widget.Toast
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.foundation.Image
 import com.daemon.expnesso.utils.QRCodeUtils
-
+import com.daemon.expnesso.ui.utils.AutoSizeText
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BookDetailsScreen(
@@ -65,6 +66,7 @@ fun BookDetailsScreen(
     val transactions by viewModel.transactions.collectAsState()
     val totalSpent = transactions.sumOf { it.amount }
     val sessionUserExpenses by viewModel.sessionUserExpenses.collectAsState()
+    val allDebts by viewModel.allDebts.collectAsState()
     val myExpense = sessionUserExpenses[sessionId] ?: 0.0
     var showInviteDialog by remember { mutableStateOf(false) }
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
@@ -195,63 +197,74 @@ fun BookDetailsScreen(
                         }
 
                         Spacer(modifier = Modifier.height(16.dp))
+                        
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Text("Total Book Expenses", color = TextSecondary, fontSize = 14.sp)
+                            Spacer(modifier = Modifier.height(4.dp))
+                            AutoSizeText(
+                                text = "₹${com.daemon.expnesso.utils.FormatUtils.formatAmount(totalSpent)}",
+                                color = Color.White,
+                                fontSize = 36.sp,
+                                fontWeight = FontWeight.Black,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            AutoSizeText(
+                                text = buildAnnotatedString {
+                                    append("Your Expense: ")
+                                    withStyle(style = SpanStyle(color = Color.White)) {
+                                        append("₹${com.daemon.expnesso.utils.FormatUtils.formatAmount(myExpense)}")
+                                    }
+                                },
+                                color = TextSecondary,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        
+                        Spacer(modifier = Modifier.height(24.dp))
+                        
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.Bottom
+                            horizontalArrangement = Arrangement.End,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
-                                Text("Total Book Expenses", color = TextSecondary, fontSize = 14.sp)
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = "₹${com.daemon.expnesso.utils.FormatUtils.formatAmount(totalSpent)}",
-                                    color = Color.White,
-                                    fontSize = 36.sp,
-                                    fontWeight = FontWeight.Black,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = buildAnnotatedString {
-                                        append("Your Expense: ")
-                                        withStyle(style = SpanStyle(color = Color.White)) {
-                                            append("₹${com.daemon.expnesso.utils.FormatUtils.formatAmount(myExpense)}")
-                                        }
-                                    },
-                                    color = TextSecondary,
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Medium
-                                )
+                            IconButton(
+                                onClick = { showInviteDialog = true },
+                                modifier = Modifier
+                                    .background(PremiumSurfaceVariant, CircleShape)
+                                    .size(40.dp)
+                            ) {
+                                Icon(Icons.Filled.PersonAdd, contentDescription = "Add Member", tint = Color.White)
                             }
-                            
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                IconButton(
-                                    onClick = { showInviteDialog = true },
-                                    modifier = Modifier
-                                        .background(PremiumSurfaceVariant, CircleShape)
-                                        .size(40.dp)
-                                ) {
-                                    Icon(Icons.Filled.PersonAdd, contentDescription = "Add Member", tint = Color.White)
-                                }
-                                Spacer(modifier = Modifier.width(12.dp))
-                                IconButton(
-                                    onClick = { navController.navigate("transactions") },
-                                    modifier = Modifier
-                                        .background(PremiumSurfaceVariant, CircleShape)
-                                        .size(40.dp)
-                                ) {
-                                    Icon(Icons.Filled.List, contentDescription = "Transactions", tint = Color.White)
-                                }
-                                Spacer(modifier = Modifier.width(12.dp))
-                                IconButton(
-                                    onClick = { navController.navigate(com.daemon.expnesso.navigation.Screen.AddExpense.route) },
-                                    modifier = Modifier
-                                        .background(PrimaryAccent, CircleShape)
-                                        .size(40.dp)
-                                ) {
-                                    Icon(Icons.Filled.Add, contentDescription = "Add Expense", tint = Color.White)
-                                }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            IconButton(
+                                onClick = { navController.navigate("transactions") },
+                                modifier = Modifier
+                                    .background(PremiumSurfaceVariant, CircleShape)
+                                    .size(40.dp)
+                            ) {
+                                Icon(Icons.Filled.List, contentDescription = "Transactions", tint = Color.White)
+                            }
+                            IconButton(
+                                onClick = { navController.navigate("activity_log/${session!!.id}") },
+                                modifier = Modifier
+                                    .background(PremiumSurfaceVariant, CircleShape)
+                                    .size(40.dp)
+                            ) {
+                                Icon(Icons.Filled.History, contentDescription = "Activity Log", tint = Color.White)
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            IconButton(
+                                onClick = { navController.navigate(com.daemon.expnesso.navigation.Screen.AddExpense.route) },
+                                modifier = Modifier
+                                    .background(PrimaryAccent, CircleShape)
+                                    .size(40.dp)
+                            ) {
+                                Icon(Icons.Filled.Add, contentDescription = "Add Expense", tint = Color.White)
                             }
                         }
                     }
@@ -284,6 +297,103 @@ fun BookDetailsScreen(
                 }
             } else {
                 item {
+                    if (allDebts.isNotEmpty()) {
+                        Text(
+                            text = "Who Owes Whom",
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            allDebts.forEach { debt ->
+                                val debtorUser = sessionMembers[debt.fromUid]
+                                val creditorUser = sessionMembers[debt.toUid]
+                                val debtorName = debtorUser?.name?.split(" ")?.firstOrNull() ?: "Unknown"
+                                val creditorName = creditorUser?.name?.split(" ")?.firstOrNull() ?: "Unknown"
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(PremiumSurface)
+                                        .padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        // Debtor
+                                        AsyncImage(
+                                            model = debtorUser?.photoUrl?.ifEmpty { "https://ui-avatars.com/api/?name=${debtorName}" } ?: "https://ui-avatars.com/api/?name=?",
+                                            contentDescription = "Avatar",
+                                            modifier = Modifier
+                                                .size(24.dp)
+                                                .clip(CircleShape)
+                                                .background(PremiumSurfaceVariant),
+                                            contentScale = ContentScale.Crop
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = debtorName,
+                                            color = TextPrimary,
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.widthIn(max = 80.dp)
+                                        )
+                                        
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = "owes",
+                                            color = TextSecondary,
+                                            fontSize = 12.sp
+                                        )
+                                        Icon(
+                                            Icons.AutoMirrored.Filled.ArrowForward,
+                                            contentDescription = "owes",
+                                            tint = TextSecondary,
+                                            modifier = Modifier.size(12.dp).padding(horizontal = 2.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+
+                                        // Creditor
+                                        AsyncImage(
+                                            model = creditorUser?.photoUrl?.ifEmpty { "https://ui-avatars.com/api/?name=${creditorName}" } ?: "https://ui-avatars.com/api/?name=?",
+                                            contentDescription = "Avatar",
+                                            modifier = Modifier
+                                                .size(24.dp)
+                                                .clip(CircleShape)
+                                                .background(PremiumSurfaceVariant),
+                                            contentScale = ContentScale.Crop
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = creditorName,
+                                            color = TextPrimary,
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.widthIn(max = 80.dp)
+                                        )
+                                    }
+                                    Text(
+                                        text = "₹${com.daemon.expnesso.utils.FormatUtils.formatAmount(debt.amount)}",
+                                        color = ErrorRed,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(32.dp))
+                    }
+
                     Text(
                         text = "Member Balances",
                         fontSize = 20.sp,
@@ -528,7 +638,7 @@ fun BalanceBarChart(netBalances: Map<String, Double>, members: Map<String, User>
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f).padding(end = 8.dp)
                     )
-                    Text(
+                    AutoSizeText(
                         text = "${if (isPositive) "+" else "-"}₹${com.daemon.expnesso.utils.FormatUtils.formatAmount(Math.abs(balance))}",
                         color = barColor,
                         fontSize = 14.sp,
@@ -621,8 +731,8 @@ fun MemberBalanceCard(member: User, balance: Double, isAdmin: Boolean) {
             Column(horizontalAlignment = Alignment.End, modifier = Modifier.widthIn(max = 120.dp)) {
                 if (balance > 0) {
                     Text("Gets Back", color = SuccessGreen, fontSize = 12.sp)
-                    Text(
-                        "+₹${com.daemon.expnesso.utils.FormatUtils.formatAmount(balance)}", 
+                    AutoSizeText(
+                        text = "+₹${com.daemon.expnesso.utils.FormatUtils.formatAmount(balance)}", 
                         color = SuccessGreen, 
                         fontSize = 16.sp, 
                         fontWeight = FontWeight.Bold,
@@ -631,8 +741,8 @@ fun MemberBalanceCard(member: User, balance: Double, isAdmin: Boolean) {
                     )
                 } else if (balance < 0) {
                     Text("Owes", color = ErrorRed, fontSize = 12.sp)
-                    Text(
-                        "-₹${com.daemon.expnesso.utils.FormatUtils.formatAmount(Math.abs(balance))}", 
+                    AutoSizeText(
+                        text = "-₹${com.daemon.expnesso.utils.FormatUtils.formatAmount(Math.abs(balance))}", 
                         color = ErrorRed, 
                         fontSize = 16.sp, 
                         fontWeight = FontWeight.Bold,

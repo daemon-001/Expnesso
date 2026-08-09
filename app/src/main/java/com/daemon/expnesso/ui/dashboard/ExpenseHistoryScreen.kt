@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.daemon.expnesso.data.model.Transaction
 import com.daemon.expnesso.ui.theme.*
+import com.daemon.expnesso.ui.utils.AutoSizeText
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -100,11 +101,13 @@ fun ExpenseHistoryScreen(navController: NavController, viewModel: DashboardViewM
                                         modifier = Modifier.weight(1f)
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
+                                    AutoSizeText(
                                         text = "₹${com.daemon.expnesso.utils.FormatUtils.formatAmount(myExpenseAmount)}",
                                         color = if (myExpenseAmount > 0) ErrorRed else Color.White,
                                         fontSize = 18.sp,
-                                        fontWeight = FontWeight.Bold
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                 }
                                 Spacer(modifier = Modifier.height(8.dp))

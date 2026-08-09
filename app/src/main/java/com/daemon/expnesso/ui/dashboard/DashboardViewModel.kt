@@ -39,6 +39,9 @@ class DashboardViewModel(
     private val _transactions = MutableStateFlow<List<Transaction>>(emptyList())
     val transactions: StateFlow<List<Transaction>> = _transactions
 
+    private val _activityLogs = MutableStateFlow<List<com.daemon.expnesso.data.model.ActivityLog>>(emptyList())
+    val activityLogs: StateFlow<List<com.daemon.expnesso.data.model.ActivityLog>> = _activityLogs
+
     private val _sessionMembers = MutableStateFlow<Map<String, User>>(emptyMap())
     val sessionMembers: StateFlow<Map<String, User>> = _sessionMembers
 
@@ -51,6 +54,9 @@ class DashboardViewModel(
 
     private val _myDebts = MutableStateFlow<List<Debt>>(emptyList())
     val myDebts: StateFlow<List<Debt>> = _myDebts
+
+    private val _allDebts = MutableStateFlow<List<Debt>>(emptyList())
+    val allDebts: StateFlow<List<Debt>> = _allDebts
 
     private val _allUserTransactionsMap = MutableStateFlow<Map<String, List<Transaction>>>(emptyMap())
     val allUserTransactions: StateFlow<List<Transaction>> = _allUserTransactionsMap
@@ -70,6 +76,7 @@ class DashboardViewModel(
 
     private var sessionJob: Job? = null
     private var transactionsJob: Job? = null
+    private var activityLogJob: Job? = null
     private val sessionBalanceJobs = mutableMapOf<String, Job>()
 
     init {
@@ -107,6 +114,7 @@ class DashboardViewModel(
         _currentSessionId.value = sessionId
         sessionJob?.cancel()
         transactionsJob?.cancel()
+        activityLogJob?.cancel()
 
         sessionJob = viewModelScope.launch {
             try {
@@ -135,6 +143,16 @@ class DashboardViewModel(
                 }
             } catch (e: Exception) {
                 // Ignore flow cancellation or permission denied on logout
+            }
+        }
+        
+        activityLogJob = viewModelScope.launch {
+            try {
+                firestoreRepository.getSessionActivityLogs(sessionId).collect { logs ->
+                    _activityLogs.value = logs
+                }
+            } catch (e: Exception) {
+                // Ignore
             }
         }
     }
@@ -194,6 +212,7 @@ class DashboardViewModel(
             if (creditors[creditor]!! < 0.01) creditors.remove(creditor)
         }
         
+        _allDebts.value = allDebts
         _myCredits.value = allDebts.filter { it.toUid == currentUserId }
         _myDebts.value = allDebts.filter { it.fromUid == currentUserId }
     }
@@ -283,8 +302,10 @@ class DashboardViewModel(
 
     fun addTransaction(amount: Double, description: String, paidByUid: String, splits: Map<String, Double>, onSuccess: () -> Unit) {
         viewModelScope.launch {
+            val currentSession = _currentSessionId.value
+            val me = _sessionMembers.value[currentUserId]
             val tx = Transaction(
-                sessionId = _currentSessionId.value,
+                sessionId = currentSession,
                 amount = amount,
                 description = description,
                 addedByUid = currentUserId,
@@ -292,6 +313,17 @@ class DashboardViewModel(
                 splits = splits
             )
             firestoreRepository.addTransaction(tx)
+            
+            // Log Activity
+            val log = com.daemon.expnesso.data.model.ActivityLog(
+                sessionId = currentSession,
+                uid = currentUserId,
+                userName = me?.name ?: "Unknown",
+                action = "Added expense",
+                details = "₹${com.daemon.expnesso.utils.FormatUtils.formatAmount(amount)} for $description"
+            )
+            firestoreRepository.addActivityLog(log)
+            
             onSuccess()
         }
     }
@@ -299,7 +331,19 @@ class DashboardViewModel(
     fun deleteTransaction(transactionId: String, adminUid: String, addedByUid: String) {
         if (currentUserId == adminUid || currentUserId == addedByUid) {
             viewModelScope.launch {
+                val tx = _transactions.value.find { it.id == transactionId }
                 firestoreRepository.deleteTransaction(transactionId)
+                if (tx != null) {
+                    val me = _sessionMembers.value[currentUserId]
+                    val log = com.daemon.expnesso.data.model.ActivityLog(
+                        sessionId = _currentSessionId.value,
+                        uid = currentUserId,
+                        userName = me?.name ?: "Unknown",
+                        action = "Deleted expense",
+                        details = "₹${com.daemon.expnesso.utils.FormatUtils.formatAmount(tx.amount)} for ${tx.description}"
+                    )
+                    firestoreRepository.addActivityLog(log)
+                }
             }
         }
     }

@@ -176,4 +176,27 @@ class FirestoreRepository {
             }
         awaitClose { listener.remove() }
     }
+
+    suspend fun addActivityLog(log: com.daemon.expnesso.data.model.ActivityLog) {
+        val id = UUID.randomUUID().toString()
+        val newLog = log.copy(id = id)
+        db.collection("activity_logs").document(id).set(newLog).await()
+    }
+
+    fun getSessionActivityLogs(sessionId: String): Flow<List<com.daemon.expnesso.data.model.ActivityLog>> = callbackFlow {
+        val listener = db.collection("activity_logs")
+            .whereEqualTo("sessionId", sessionId)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    close(error)
+                    return@addSnapshotListener
+                }
+                if (snapshot != null) {
+                    val logs = snapshot.documents.mapNotNull { it.toObject(com.daemon.expnesso.data.model.ActivityLog::class.java) }
+                        .sortedByDescending { it.timestamp }
+                    trySend(logs)
+                }
+            }
+        awaitClose { listener.remove() }
+    }
 }

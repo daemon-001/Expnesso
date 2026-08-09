@@ -77,6 +77,7 @@ import com.daemon.expnesso.data.repository.AuthRepository
 import com.daemon.expnesso.data.repository.FirestoreRepository
 import com.daemon.expnesso.ui.theme.*
 import com.daemon.expnesso.ui.utils.shimmerEffect
+import com.daemon.expnesso.ui.utils.AutoSizeText
 import com.daemon.expnesso.utils.QRCodeUtils
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.codescanner.GmsBarcodeScannerOptions
@@ -351,11 +352,13 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
                         color = TextSecondary,
                         fontWeight = FontWeight.Medium
                     )
-                    Text(
+                    AutoSizeText(
                         text = "₹${com.daemon.expnesso.utils.FormatUtils.formatAmount(globalTotalExpense)}",
                         fontSize = 36.sp,
                         color = Color.White,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                     
                     val (globalBalanceText, globalBalanceColor) = when {
@@ -528,7 +531,7 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
                                                 fontSize = 13.sp,
                                                 fontWeight = FontWeight.Medium
                                             )
-                                            Text(
+                                            AutoSizeText(
                                                 text = "₹${com.daemon.expnesso.utils.FormatUtils.formatAmount(currentUserExpense)}",
                                                 fontSize = 26.sp,
                                                 fontWeight = FontWeight.Bold,
@@ -550,12 +553,12 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
                                             Column {
                                                 Text("Will get", color = TextSecondary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
                                                 Spacer(modifier = Modifier.height(4.dp))
-                                                Text("₹${com.daemon.expnesso.utils.FormatUtils.formatAmount(totalWillGet)}", color = SuccessGreen, fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                                AutoSizeText("₹${com.daemon.expnesso.utils.FormatUtils.formatAmount(totalWillGet)}", color = SuccessGreen, fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                             }
                                             Column {
                                                 Text("Will pay", color = TextSecondary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
                                                 Spacer(modifier = Modifier.height(4.dp))
-                                                Text("₹${com.daemon.expnesso.utils.FormatUtils.formatAmount(totalWillPay)}", color = ErrorRed, fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                                AutoSizeText("₹${com.daemon.expnesso.utils.FormatUtils.formatAmount(totalWillPay)}", color = ErrorRed, fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                             }
                                         }
 
@@ -698,7 +701,7 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
                                                     Spacer(modifier = Modifier.width(8.dp))
                                                     Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
                                                         Text(firstName, color = TextPrimary, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                                        Text("+₹${com.daemon.expnesso.utils.FormatUtils.formatAmount(debt.amount)}", color = SuccessGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                                        AutoSizeText("+₹${com.daemon.expnesso.utils.FormatUtils.formatAmount(debt.amount)}", color = SuccessGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                                     }
                                                 }
                                                 Spacer(modifier = Modifier.height(12.dp))
@@ -729,7 +732,7 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
                                                     Spacer(modifier = Modifier.width(8.dp))
                                                     Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
                                                         Text(firstName, color = TextPrimary, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                                        Text("-₹${com.daemon.expnesso.utils.FormatUtils.formatAmount(debt.amount)}", color = ErrorRed, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                                        AutoSizeText("-₹${com.daemon.expnesso.utils.FormatUtils.formatAmount(debt.amount)}", color = ErrorRed, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                                     }
                                                 }
                                                 Spacer(modifier = Modifier.height(12.dp))

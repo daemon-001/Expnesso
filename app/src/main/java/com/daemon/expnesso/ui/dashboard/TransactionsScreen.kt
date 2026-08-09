@@ -41,7 +41,7 @@ import com.daemon.expnesso.ui.theme.TextPrimary
 import com.daemon.expnesso.ui.theme.TextSecondary
 import java.text.SimpleDateFormat
 import java.util.Locale
-
+import com.daemon.expnesso.ui.utils.AutoSizeText
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TransactionsScreen(navController: NavController, viewModel: DashboardViewModel) {
@@ -174,11 +174,13 @@ fun TransactionItem(
                     Text(transaction.description, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Medium)
                     Text("${sdf.format(transaction.timestamp.toDate())} • Paid by ${paidBy?.name ?: "Unknown"}", color = TextSecondary, fontSize = 12.sp)
                 }
-                Text(
+                AutoSizeText(
                     text = "₹${com.daemon.expnesso.utils.FormatUtils.formatAmount(transaction.amount)}",
                     color = Color.White,
                     fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
 
                 if (canDelete) {
@@ -217,7 +219,7 @@ fun TransactionItem(
                                 contentScale = ContentScale.Crop
                             )
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text(
+                            AutoSizeText(
                                 text = "${user?.name?.split(" ")?.firstOrNull() ?: "Unknown"} • ₹${com.daemon.expnesso.utils.FormatUtils.formatAmount(splitAmount)}",
                                 color = TextSecondary,
                                 fontSize = 11.sp,

@@ -33,3 +33,13 @@ data class Transaction(
     val splits: Map<String, Double> = emptyMap(),
     val timestamp: Timestamp = Timestamp.now()
 )
+
+data class ActivityLog(
+    val id: String = "",
+    val sessionId: String = "",
+    val uid: String = "",
+    val userName: String = "",
+    val action: String = "",
+    val details: String = "",
+    val timestamp: Timestamp = Timestamp.now()
+)
