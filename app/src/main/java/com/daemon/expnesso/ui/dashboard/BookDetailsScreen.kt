@@ -229,7 +229,7 @@ fun BookDetailsScreen(
                         
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.End,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             IconButton(
@@ -240,7 +240,6 @@ fun BookDetailsScreen(
                             ) {
                                 Icon(Icons.Filled.PersonAdd, contentDescription = "Add Member", tint = Color.White)
                             }
-                            Spacer(modifier = Modifier.width(12.dp))
                             IconButton(
                                 onClick = { navController.navigate("transactions") },
                                 modifier = Modifier
@@ -257,7 +256,6 @@ fun BookDetailsScreen(
                             ) {
                                 Icon(Icons.Filled.History, contentDescription = "Activity Log", tint = Color.White)
                             }
-                            Spacer(modifier = Modifier.width(12.dp))
                             IconButton(
                                 onClick = { navController.navigate(com.daemon.expnesso.navigation.Screen.AddExpense.route) },
                                 modifier = Modifier

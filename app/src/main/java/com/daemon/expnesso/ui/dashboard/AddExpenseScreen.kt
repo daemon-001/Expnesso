@@ -28,6 +28,11 @@ import androidx.navigation.NavController
 import com.daemon.expnesso.data.model.User
 import com.daemon.expnesso.ui.theme.*
 
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
+import androidx.compose.material3.TabRow
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRowDefaults
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddExpenseScreen(
@@ -61,7 +66,11 @@ fun AddExpenseScreen(
         }
     }
 
-    val suggestions = listOf("Food \uD83C\uDF54", "Transport \uD83D\uDE95", "Rent \uD83C\uDFE0", "Groceries \uD83D\uDED2", "Shopping \uD83D\uDECD\uFE0F", "Entertainment \uD83C\uDF7F", "Medical \uD83D\uDC8A", "Other \uD83D\uDCCC")
+    val suggestions = listOf("Food 🍔", "Transport 🚕", "Rent 🏠", "Groceries 🛒", "Shopping 🛍️", "Entertainment 🍿", "Medical 💊", "Other 📌")
+
+    var selectedTab by remember { mutableIntStateOf(0) }
+    var paidToUid by remember { mutableStateOf(membersList.firstOrNull { it.uid != currentUserId }?.uid ?: "") }
+    var showPayToDropdown by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -83,6 +92,32 @@ fun AddExpenseScreen(
                 .padding(padding)
                 .padding(horizontal = 16.dp)
         ) {
+            TabRow(
+                selectedTabIndex = selectedTab,
+                containerColor = Color.Transparent,
+                contentColor = PrimaryAccent,
+                indicator = { tabPositions ->
+                    if (selectedTab < tabPositions.size) {
+                        TabRowDefaults.SecondaryIndicator(
+                            modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
+                            color = PrimaryAccent
+                        )
+                    }
+                },
+                divider = { HorizontalDivider(color = PremiumSurfaceVariant) }
+            ) {
+                Tab(
+                    selected = selectedTab == 0,
+                    onClick = { selectedTab = 0 },
+                    text = { Text("Add Expense", color = if (selectedTab == 0) PrimaryAccent else TextSecondary) }
+                )
+                Tab(
+                    selected = selectedTab == 1,
+                    onClick = { selectedTab = 1 },
+                    text = { Text("Pay Off", color = if (selectedTab == 1) PrimaryAccent else TextSecondary) }
+                )
+            }
+            Spacer(modifier = Modifier.height(16.dp))
             LazyColumn(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -199,121 +234,167 @@ fun AddExpenseScreen(
                     
                     item {
                         // Split Mode Toggle
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(56.dp)
-                                .clip(RoundedCornerShape(28.dp))
-                                .background(PremiumSurfaceVariant.copy(alpha = 0.5f))
-                                .padding(4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .fillMaxHeight()
-                                    .clip(RoundedCornerShape(24.dp))
-                                    .background(if (!isCustomSplit) PrimaryAccent else Color.Transparent)
-                                    .clickable { isCustomSplit = false },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    "Split Equally", 
-                                    color = if (!isCustomSplit) Color.Black else TextSecondary,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 15.sp
-                                )
-                            }
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .fillMaxHeight()
-                                    .clip(RoundedCornerShape(24.dp))
-                                    .background(if (isCustomSplit) PrimaryAccent else Color.Transparent)
-                                    .clickable { isCustomSplit = true },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    "Split Custom", 
-                                    color = if (isCustomSplit) Color.Black else TextSecondary,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 15.sp
-                                )
-                            }
-                        }
-                    }
-
-                    if (isCustomSplit) {
-                        item {
-                            val totalAmt = amount.toDoubleOrNull() ?: 0.0
-                            val currentSum = selectedUids.filterValues { it }.keys.sumOf { customAmounts[it]?.toDoubleOrNull() ?: 0.0 }
-                            
-                            val diff = totalAmt - currentSum
-                            
-                            val (tallyText, tallyColor) = when {
-                                totalAmt == 0.0 -> "Enter amount above" to TextSecondary
-                                kotlin.math.abs(diff) < 0.01 -> "Tallied" to Color(0xFF4CAF50)
-                                diff > 0 -> "Remaining: ₹${String.format("%.2f", diff)}" to Color(0xFFFFC107)
-                                else -> "Over by: ₹${String.format("%.2f", -diff)}" to ErrorRed
-                            }
-
+                        if (selectedTab == 0) {
                             Row(
-                                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(56.dp)
+                                    .clip(RoundedCornerShape(28.dp))
+                                    .background(PremiumSurfaceVariant.copy(alpha = 0.5f))
+                                    .padding(4.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text("Custom Split", color = TextSecondary, fontSize = 14.sp)
-                                Text(tallyText, color = tallyColor, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    } else {
-                        item {
-                            Text("Split equally between:", color = TextSecondary, fontSize = 14.sp, modifier = Modifier.padding(start = 4.dp, bottom = 4.dp))
-                        }
-                    }
-
-                    items(membersList) { member ->
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(PremiumSurface)
-                                .clickable {
-                                    selectedUids[member.uid] = !(selectedUids[member.uid] ?: false)
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .fillMaxHeight()
+                                        .clip(RoundedCornerShape(24.dp))
+                                        .background(if (!isCustomSplit) PrimaryAccent else Color.Transparent)
+                                        .clickable { isCustomSplit = false },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        "Split Equally", 
+                                        color = if (!isCustomSplit) Color.Black else TextSecondary,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 15.sp
+                                    )
                                 }
-                                .padding(horizontal = 8.dp, vertical = 8.dp)
-                        ) {
-                            Checkbox(
-                                checked = selectedUids[member.uid] == true,
-                                onCheckedChange = { checked -> selectedUids[member.uid] = checked },
-                                colors = CheckboxDefaults.colors(
-                                    checkedColor = PrimaryAccent,
-                                    checkmarkColor = Color.Black,
-                                    uncheckedColor = TextSecondary
-                                )
-                            )
-                            Text(member.name, color = TextPrimary, modifier = Modifier.weight(1f))
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .fillMaxHeight()
+                                        .clip(RoundedCornerShape(24.dp))
+                                        .background(if (isCustomSplit) PrimaryAccent else Color.Transparent)
+                                        .clickable { isCustomSplit = true },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        "Split Custom", 
+                                        color = if (isCustomSplit) Color.Black else TextSecondary,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 15.sp
+                                    )
+                                }
+                            }
+                        } else {
+                            Text("Paid To", color = TextSecondary, fontSize = 14.sp, modifier = Modifier.padding(start = 4.dp))
                             
-                            if (isCustomSplit && selectedUids[member.uid] == true) {
+                            Box(modifier = Modifier.fillMaxWidth()) {
+                                val paidToUser = membersList.find { it.uid == paidToUid }
                                 OutlinedTextField(
-                                    value = customAmounts[member.uid] ?: "",
-                                    onValueChange = { customAmounts[member.uid] = it },
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
-                                    singleLine = true,
-                                    placeholder = { Text("0", color = TextSecondary.copy(alpha = 0.5f), modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.End) },
-                                    modifier = Modifier.width(90.dp).height(50.dp),
-                                    textStyle = LocalTextStyle.current.copy(textAlign = TextAlign.End, fontSize = 16.sp, fontWeight = FontWeight.Bold),
+                                    value = paidToUser?.name ?: "Unknown",
+                                    onValueChange = {},
+                                    readOnly = true,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { showPayToDropdown = true },
                                     colors = OutlinedTextFieldDefaults.colors(
                                         focusedTextColor = TextPrimary,
                                         unfocusedTextColor = TextPrimary,
-                                        focusedBorderColor = PrimaryAccent,
-                                        unfocusedBorderColor = PremiumSurfaceVariant.copy(alpha = 0.5f),
-                                        focusedContainerColor = PremiumSurfaceVariant.copy(alpha = 0.3f),
-                                        unfocusedContainerColor = PremiumSurfaceVariant.copy(alpha = 0.3f)
+                                        disabledTextColor = TextPrimary,
+                                        focusedBorderColor = PremiumSurfaceVariant,
+                                        unfocusedBorderColor = PremiumSurfaceVariant,
+                                        focusedContainerColor = PremiumSurface,
+                                        unfocusedContainerColor = PremiumSurface
                                     ),
-                                    shape = RoundedCornerShape(8.dp)
+                                    enabled = false,
+                                    shape = RoundedCornerShape(16.dp)
                                 )
+                                DropdownMenu(
+                                    expanded = showPayToDropdown,
+                                    onDismissRequest = { showPayToDropdown = false },
+                                    modifier = Modifier.background(PremiumSurfaceVariant)
+                                ) {
+                                    membersList.forEach { member ->
+                                        if (member.uid != paidByUid) {
+                                            DropdownMenuItem(
+                                                text = { Text(member.name, color = TextPrimary) },
+                                                onClick = {
+                                                    paidToUid = member.uid
+                                                    showPayToDropdown = false
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if (selectedTab == 0) {
+                        if (isCustomSplit) {
+                            item {
+                                val totalAmt = amount.toDoubleOrNull() ?: 0.0
+                                val currentSum = selectedUids.filterValues { it }.keys.sumOf { customAmounts[it]?.toDoubleOrNull() ?: 0.0 }
+                                
+                                val diff = totalAmt - currentSum
+                                
+                                val (tallyText, tallyColor) = when {
+                                    totalAmt == 0.0 -> "Enter amount above" to TextSecondary
+                                    kotlin.math.abs(diff) < 0.01 -> "Tallied" to Color(0xFF4CAF50)
+                                    diff > 0 -> "Remaining: ₹${String.format("%.2f", diff)}" to Color(0xFFFFC107)
+                                    else -> "Over by: ₹${String.format("%.2f", -diff)}" to ErrorRed
+                                }
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("Custom Split", color = TextSecondary, fontSize = 14.sp)
+                                    Text(tallyText, color = tallyColor, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        } else {
+                            item {
+                                Text("Split equally between:", color = TextSecondary, fontSize = 14.sp, modifier = Modifier.padding(start = 4.dp, bottom = 4.dp))
+                            }
+                        }
+
+                        items(membersList) { member ->
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(PremiumSurface)
+                                    .clickable {
+                                        selectedUids[member.uid] = !(selectedUids[member.uid] ?: false)
+                                    }
+                                    .padding(horizontal = 8.dp, vertical = 8.dp)
+                            ) {
+                                Checkbox(
+                                    checked = selectedUids[member.uid] == true,
+                                    onCheckedChange = { checked -> selectedUids[member.uid] = checked },
+                                    colors = CheckboxDefaults.colors(
+                                        checkedColor = PrimaryAccent,
+                                        checkmarkColor = Color.Black,
+                                        uncheckedColor = TextSecondary
+                                    )
+                                )
+                                Text(member.name, color = TextPrimary, modifier = Modifier.weight(1f))
+                                
+                                if (isCustomSplit && selectedUids[member.uid] == true) {
+                                    OutlinedTextField(
+                                        value = customAmounts[member.uid] ?: "",
+                                        onValueChange = { customAmounts[member.uid] = it },
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+                                        singleLine = true,
+                                        placeholder = { Text("0", color = TextSecondary.copy(alpha = 0.5f), modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.End) },
+                                        modifier = Modifier.width(90.dp).height(50.dp),
+                                        textStyle = LocalTextStyle.current.copy(textAlign = TextAlign.End, fontSize = 16.sp, fontWeight = FontWeight.Bold),
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedTextColor = TextPrimary,
+                                            unfocusedTextColor = TextPrimary,
+                                            focusedBorderColor = PrimaryAccent,
+                                            unfocusedBorderColor = PremiumSurfaceVariant.copy(alpha = 0.5f),
+                                            focusedContainerColor = PremiumSurfaceVariant.copy(alpha = 0.3f),
+                                            unfocusedContainerColor = PremiumSurfaceVariant.copy(alpha = 0.3f)
+                                        ),
+                                        shape = RoundedCornerShape(8.dp)
+                                    )
+                                }
                             }
                         }
                     }
@@ -329,26 +410,35 @@ fun AddExpenseScreen(
                 onClick = {
                     val amt = amount.toDoubleOrNull()
                     if (amt != null && description.isNotBlank()) {
-                        val activeSplits = selectedUids.filterValues { it }.keys
-                        val splits = if (isGroup && activeSplits.isNotEmpty()) {
-                            if (isCustomSplit) {
-                                activeSplits.associateWith { customAmounts[it]?.toDoubleOrNull() ?: 0.0 }
-                            } else {
-                                val splitAmount = amt / activeSplits.size
-                                activeSplits.associateWith { splitAmount }
+                        if (selectedTab == 0) {
+                            val activeSplits = selectedUids.filterValues { it }.keys
+                            val splits = if (isGroup && activeSplits.isNotEmpty()) {
+                                if (isCustomSplit) {
+                                    activeSplits.associateWith { customAmounts[it]?.toDoubleOrNull() ?: 0.0 }
+                                } else {
+                                    val splitAmount = amt / activeSplits.size
+                                    activeSplits.associateWith { splitAmount }
+                                }
+                            } else emptyMap()
+                            
+                            // Check custom split tally
+                            if (isGroup && isCustomSplit) {
+                                val sum = splits.values.sum()
+                                if (kotlin.math.abs(sum - amt) > 0.01) {
+                                    return@Button
+                                }
                             }
-                        } else emptyMap()
-                        
-                        // Check custom split tally
-                        if (isGroup && isCustomSplit) {
-                            val sum = splits.values.sum()
-                            if (kotlin.math.abs(sum - amt) > 0.01) {
-                                return@Button
+                            
+                            viewModel.addTransaction(amt, description, paidByUid, splits) {
+                                navController.popBackStack()
                             }
-                        }
-                        
-                        viewModel.addTransaction(amt, description, paidByUid, splits) {
-                            navController.popBackStack()
+                        } else {
+                            if (paidToUid.isNotBlank()) {
+                                val splits = mapOf(paidToUid to amt)
+                                viewModel.addTransaction(amt, description, paidByUid, splits) {
+                                    navController.popBackStack()
+                                }
+                            }
                         }
                     }
                 },
@@ -363,9 +453,13 @@ fun AddExpenseScreen(
                     disabledContainerColor = PremiumSurfaceVariant,
                     disabledContentColor = TextSecondary
                 ),
-                enabled = amount.toDoubleOrNull() != null && description.isNotBlank() && (!isCustomSplit || kotlin.math.abs((amount.toDoubleOrNull() ?: 0.0) - selectedUids.filterValues { it }.keys.sumOf { customAmounts[it]?.toDoubleOrNull() ?: 0.0 }) < 0.01)
+                enabled = amount.toDoubleOrNull() != null && description.isNotBlank() && 
+                          (if (selectedTab == 0) 
+                              (!isCustomSplit || kotlin.math.abs((amount.toDoubleOrNull() ?: 0.0) - selectedUids.filterValues { it }.keys.sumOf { customAmounts[it]?.toDoubleOrNull() ?: 0.0 }) < 0.01)
+                           else 
+                              paidToUid.isNotBlank() && paidByUid != paidToUid)
             ) {
-                Text("Add Expense", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Text(if (selectedTab == 0) "Add Expense" else "Pay Off", fontWeight = FontWeight.Bold, fontSize = 16.sp)
             }
         }
     }
