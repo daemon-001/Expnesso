@@ -31,7 +31,10 @@ data class Transaction(
     val addedByUid: String = "",
     val paidByUid: String = "",
     val splits: Map<String, Double> = emptyMap(),
-    val timestamp: Timestamp = Timestamp.now()
+    val timestamp: Timestamp = Timestamp.now(),
+    @get:com.google.firebase.firestore.Exclude 
+    @set:com.google.firebase.firestore.Exclude 
+    var isSynced: Boolean = true
 )
 
 data class ActivityLog(

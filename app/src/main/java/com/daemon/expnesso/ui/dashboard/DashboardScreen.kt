@@ -37,6 +37,8 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.MoreVert
@@ -96,8 +98,10 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
     val allSessions by viewModel.allSessions.collectAsState()
     val isSessionsLoaded by viewModel.isSessionsLoaded.collectAsState()
     val currentSessionId by viewModel.currentSessionId.collectAsState()
+    val allUserTransactions by viewModel.allUserTransactions.collectAsState()
     val sessionMembers by viewModel.sessionMembers.collectAsState()
     val netBalances by viewModel.netBalances.collectAsState()
+    val isNetworkAvailable by com.daemon.expnesso.ui.utils.rememberNetworkStatus()
 
     // Dialog States
     var fabExpanded by remember { mutableStateOf(false) }
@@ -456,6 +460,12 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
                                             )
                                         }
                                         Row(verticalAlignment = Alignment.CenterVertically) {
+                                            val hasPendingSync = transactions.any { !it.isSynced }
+                                            if (!isNetworkAvailable || hasPendingSync) {
+                                                Icon(Icons.Default.CloudOff, contentDescription = "Offline or Pending Sync", tint = ErrorRed, modifier = Modifier.padding(end = 8.dp).size(24.dp))
+                                            } else if (transactions.isNotEmpty()) {
+                                                Icon(Icons.Default.CloudDone, contentDescription = "Synced", tint = SuccessGreen, modifier = Modifier.padding(end = 8.dp).size(24.dp))
+                                            }
                                             IconButton(onClick = { navController.navigate(com.daemon.expnesso.navigation.Screen.AddExpense.route) }) {
                                                 Icon(Icons.Default.Add, contentDescription = "Add Expense", tint = Color.White)
                                             }
@@ -768,6 +778,7 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
 
             items(allSessions) { s ->
                 val balances = sessionBalances[s.id] ?: Pair(0.0, 0.0)
+                val sessionTx = allUserTransactions.filter { it.sessionId == s.id }
                 BookItem(
                     session = s,
                     expense = sessionUserExpenses[s.id] ?: 0.0,
@@ -775,6 +786,9 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
                     willPay = balances.second,
                     isSelected = s.id == session?.id,
                     isDefault = s.id == currentUser?.defaultSessionId,
+                    hasPendingSync = sessionTx.any { !it.isSynced },
+                    hasTransactions = sessionTx.isNotEmpty(),
+                    isNetworkAvailable = isNetworkAvailable,
                     onClick = { viewModel.switchSession(s.id) }
                 )
             }
@@ -1062,6 +1076,9 @@ fun BookItem(
     willPay: Double,
     isSelected: Boolean,
     isDefault: Boolean = false,
+    hasPendingSync: Boolean = false,
+    hasTransactions: Boolean = false,
+    isNetworkAvailable: Boolean = true,
     onClick: () -> Unit
 ) {
     Card(
@@ -1094,8 +1111,16 @@ fun BookItem(
                     }
                 }
             }
-            if (isDefault) {
-                Icon(Icons.Default.Star, contentDescription = "Default", tint = SecondaryAccent)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (isDefault) {
+                    Icon(Icons.Default.Star, contentDescription = "Default", tint = SecondaryAccent)
+                    Spacer(modifier = Modifier.width(8.dp))
+                }
+                if (!isNetworkAvailable || hasPendingSync) {
+                    Icon(Icons.Default.CloudOff, contentDescription = "Offline or Pending Sync", tint = ErrorRed, modifier = Modifier.size(24.dp))
+                } else if (hasTransactions) {
+                    Icon(Icons.Default.CloudDone, contentDescription = "Synced", tint = SuccessGreen, modifier = Modifier.size(24.dp))
+                }
             }
         }
     }

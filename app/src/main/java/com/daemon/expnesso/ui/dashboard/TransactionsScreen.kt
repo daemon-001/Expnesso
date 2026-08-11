@@ -13,6 +13,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
@@ -174,14 +176,22 @@ fun TransactionItem(
                     Text(transaction.description, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Medium)
                     Text("${sdf.format(transaction.timestamp.toDate())} • Paid by ${paidBy?.name ?: "Unknown"}", color = TextSecondary, fontSize = 12.sp)
                 }
-                AutoSizeText(
-                    text = "₹${com.daemon.expnesso.utils.FormatUtils.formatAmount(transaction.amount)}",
-                    color = Color.White,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (transaction.isSynced) {
+                        Icon(Icons.Default.CloudDone, contentDescription = "Synced", tint = com.daemon.expnesso.ui.theme.SuccessGreen, modifier = Modifier.size(20.dp))
+                    } else {
+                        Icon(Icons.Default.CloudOff, contentDescription = "Pending Sync", tint = ErrorRed, modifier = Modifier.size(20.dp))
+                    }
+                    Spacer(modifier = Modifier.width(4.dp))
+                    AutoSizeText(
+                        text = "₹${com.daemon.expnesso.utils.FormatUtils.formatAmount(transaction.amount)}",
+                        color = Color.White,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
 
                 if (canDelete) {
                     IconButton(onClick = { showDeleteDialog = true }) {

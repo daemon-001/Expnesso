@@ -138,7 +138,7 @@ class FirestoreRepository {
     suspend fun addTransaction(transaction: Transaction) {
         val id = UUID.randomUUID().toString()
         val newTransaction = transaction.copy(id = id)
-        db.collection("transactions").document(id).set(newTransaction).await()
+        db.collection("transactions").document(id).set(newTransaction)
     }
 
     suspend fun deleteTransaction(transactionId: String) {
@@ -149,13 +149,17 @@ class FirestoreRepository {
         val listener = db.collection("transactions")
             .whereEqualTo("sessionId", sessionId)
             .orderBy("timestamp", Query.Direction.DESCENDING)
-            .addSnapshotListener { snapshot, error ->
+            .addSnapshotListener(com.google.firebase.firestore.MetadataChanges.INCLUDE) { snapshot, error ->
                 if (error != null) {
                     close(error)
                     return@addSnapshotListener
                 }
                 if (snapshot != null) {
-                    val transactions = snapshot.documents.mapNotNull { it.toObject(Transaction::class.java) }
+                    val transactions = snapshot.documents.mapNotNull { doc ->
+                        val tx = doc.toObject(Transaction::class.java)
+                        tx?.isSynced = !doc.metadata.hasPendingWrites()
+                        tx
+                    }
                     trySend(transactions)
                 }
             }
@@ -180,7 +184,7 @@ class FirestoreRepository {
     suspend fun addActivityLog(log: com.daemon.expnesso.data.model.ActivityLog) {
         val id = UUID.randomUUID().toString()
         val newLog = log.copy(id = id)
-        db.collection("activity_logs").document(id).set(newLog).await()
+        db.collection("activity_logs").document(id).set(newLog)
     }
 
     fun getSessionActivityLogs(sessionId: String): Flow<List<com.daemon.expnesso.data.model.ActivityLog>> = callbackFlow {

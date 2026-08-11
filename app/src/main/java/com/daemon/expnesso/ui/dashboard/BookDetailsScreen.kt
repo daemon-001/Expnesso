@@ -14,6 +14,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
@@ -141,16 +143,26 @@ fun BookDetailsScreen(
                                 overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.weight(1f)
                             )
-                            if (session!!.adminUid == viewModel.currentUserId) {
-                                IconButton(
-                                    onClick = { 
-                                        showDeleteConfirmDialog = true
-                                    },
-                                    modifier = Modifier
-                                        .background(ErrorRed.copy(alpha = 0.2f), CircleShape)
-                                        .size(36.dp)
-                                ) {
-                                    Icon(Icons.Filled.Delete, contentDescription = "Delete Book", tint = ErrorRed, modifier = Modifier.size(20.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                val isNetworkAvailable by com.daemon.expnesso.ui.utils.rememberNetworkStatus()
+                                val hasPendingSync = transactions.any { !it.isSynced }
+                                if (!isNetworkAvailable || hasPendingSync) {
+                                    Icon(Icons.Default.CloudOff, contentDescription = "Offline or Pending Sync", tint = ErrorRed, modifier = Modifier.padding(end = 8.dp).size(24.dp))
+                                } else if (transactions.isNotEmpty()) {
+                                    Icon(Icons.Default.CloudDone, contentDescription = "Synced", tint = SuccessGreen, modifier = Modifier.padding(end = 8.dp).size(24.dp))
+                                }
+                                
+                                if (session!!.adminUid == viewModel.currentUserId) {
+                                    IconButton(
+                                        onClick = { 
+                                            showDeleteConfirmDialog = true
+                                        },
+                                        modifier = Modifier
+                                            .background(ErrorRed.copy(alpha = 0.2f), CircleShape)
+                                            .size(36.dp)
+                                    ) {
+                                        Icon(Icons.Filled.Delete, contentDescription = "Delete Book", tint = ErrorRed, modifier = Modifier.size(20.dp))
+                                    }
                                 }
                             }
                         }

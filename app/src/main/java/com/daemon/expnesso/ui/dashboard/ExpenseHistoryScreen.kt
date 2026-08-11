@@ -8,6 +8,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Receipt
+import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -100,15 +102,22 @@ fun ExpenseHistoryScreen(navController: NavController, viewModel: DashboardViewM
                                         overflow = TextOverflow.Ellipsis,
                                         modifier = Modifier.weight(1f)
                                     )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    AutoSizeText(
-                                        text = "₹${com.daemon.expnesso.utils.FormatUtils.formatAmount(myExpenseAmount)}",
-                                        color = if (myExpenseAmount > 0) ErrorRed else Color.White,
-                                        fontSize = 18.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        if (tx.isSynced) {
+                                            Icon(Icons.Default.CloudDone, contentDescription = "Synced", tint = SuccessGreen, modifier = Modifier.size(20.dp))
+                                        } else {
+                                            Icon(Icons.Default.CloudOff, contentDescription = "Pending Sync", tint = ErrorRed, modifier = Modifier.size(20.dp))
+                                        }
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        AutoSizeText(
+                                            text = "₹${com.daemon.expnesso.utils.FormatUtils.formatAmount(myExpenseAmount)}",
+                                            color = if (myExpenseAmount > 0) ErrorRed else Color.White,
+                                            fontSize = 18.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
                                 }
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Row(

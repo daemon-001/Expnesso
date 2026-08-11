@@ -25,6 +25,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.daemon.expnesso.data.model.User
 import com.daemon.expnesso.ui.theme.*
 
@@ -71,6 +73,7 @@ fun AddExpenseScreen(
     var selectedTab by remember { mutableIntStateOf(0) }
     var paidToUid by remember { mutableStateOf(membersList.firstOrNull { it.uid != currentUserId }?.uid ?: "") }
     var showPayToDropdown by remember { mutableStateOf(false) }
+    var isLoading by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -410,6 +413,7 @@ fun AddExpenseScreen(
                 onClick = {
                     val amt = amount.toDoubleOrNull()
                     if (amt != null && description.isNotBlank()) {
+                        isLoading = true
                         if (selectedTab == 0) {
                             val activeSplits = selectedUids.filterValues { it }.keys
                             val splits = if (isGroup && activeSplits.isNotEmpty()) {
@@ -425,19 +429,24 @@ fun AddExpenseScreen(
                             if (isGroup && isCustomSplit) {
                                 val sum = splits.values.sum()
                                 if (kotlin.math.abs(sum - amt) > 0.01) {
+                                    isLoading = false
                                     return@Button
                                 }
                             }
                             
                             viewModel.addTransaction(amt, description, paidByUid, splits) {
+                                isLoading = false
                                 navController.popBackStack()
                             }
                         } else {
                             if (paidToUid.isNotBlank()) {
                                 val splits = mapOf(paidToUid to amt)
                                 viewModel.addTransaction(amt, description, paidByUid, splits) {
+                                    isLoading = false
                                     navController.popBackStack()
                                 }
+                            } else {
+                                isLoading = false
                             }
                         }
                     }
@@ -453,13 +462,32 @@ fun AddExpenseScreen(
                     disabledContainerColor = PremiumSurfaceVariant,
                     disabledContentColor = TextSecondary
                 ),
-                enabled = amount.toDoubleOrNull() != null && description.isNotBlank() && 
+                enabled = !isLoading && amount.toDoubleOrNull() != null && description.isNotBlank() && 
                           (if (selectedTab == 0) 
                               (!isCustomSplit || kotlin.math.abs((amount.toDoubleOrNull() ?: 0.0) - selectedUids.filterValues { it }.keys.sumOf { customAmounts[it]?.toDoubleOrNull() ?: 0.0 }) < 0.01)
                            else 
                               paidToUid.isNotBlank() && paidByUid != paidToUid)
             ) {
                 Text(if (selectedTab == 0) "Add Expense" else "Pay Off", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            }
+        }
+        
+        if (isLoading) {
+            Dialog(
+                onDismissRequest = { },
+                properties = DialogProperties(
+                    dismissOnBackPress = false,
+                    dismissOnClickOutside = false
+                )
+            ) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .size(100.dp)
+                        .background(PremiumSurface, shape = RoundedCornerShape(16.dp))
+                ) {
+                    CircularProgressIndicator(color = PrimaryAccent)
+                }
             }
         }
     }
