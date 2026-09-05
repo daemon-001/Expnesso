@@ -17,6 +17,7 @@ sealed class Screen(val route: String) {
         fun createRoute(sessionId: String) = "book_details/$sessionId"
     }
     object ExpenseHistory : Screen("expense_history")
+    object ExpenseAnalytics : Screen("expense_analytics")
     object AddExpense : Screen("add_expense")
     object ActivityLog : Screen("activity_log/{sessionId}") {
         fun createRoute(sessionId: String) = "activity_log/$sessionId"
@@ -100,6 +101,11 @@ fun AppNavigation() {
         composable(Screen.ExpenseHistory.route) {
             sharedDashboardViewModel?.let { vm ->
                 com.daemon.expnesso.ui.dashboard.ExpenseHistoryScreen(navController, vm)
+            }
+        }
+        composable(Screen.ExpenseAnalytics.route) {
+            sharedDashboardViewModel?.let { vm ->
+                com.daemon.expnesso.ui.dashboard.ExpenseAnalyticsScreen(navController, vm)
             }
         }
         composable(Screen.AddExpense.route) {

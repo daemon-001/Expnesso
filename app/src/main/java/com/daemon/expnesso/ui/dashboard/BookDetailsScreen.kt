@@ -152,6 +152,16 @@ fun BookDetailsScreen(
                                     Icon(Icons.Default.CloudDone, contentDescription = "Synced", tint = SuccessGreen, modifier = Modifier.padding(end = 8.dp).size(24.dp))
                                 }
                                 
+                                IconButton(
+                                    onClick = { navController.navigate("activity_log/${session!!.id}") },
+                                    modifier = Modifier
+                                        .padding(end = if (session!!.adminUid == viewModel.currentUserId) 8.dp else 0.dp)
+                                        .background(PremiumSurfaceVariant, CircleShape)
+                                        .size(36.dp)
+                                ) {
+                                    Icon(Icons.Filled.List, contentDescription = "Activity Log", tint = Color.White, modifier = Modifier.size(20.dp))
+                                }
+                                
                                 if (session!!.adminUid == viewModel.currentUserId) {
                                     IconButton(
                                         onClick = { 
@@ -258,15 +268,7 @@ fun BookDetailsScreen(
                                     .background(PremiumSurfaceVariant, CircleShape)
                                     .size(40.dp)
                             ) {
-                                Icon(Icons.Filled.List, contentDescription = "Transactions", tint = Color.White)
-                            }
-                            IconButton(
-                                onClick = { navController.navigate("activity_log/${session!!.id}") },
-                                modifier = Modifier
-                                    .background(PremiumSurfaceVariant, CircleShape)
-                                    .size(40.dp)
-                            ) {
-                                Icon(Icons.Filled.History, contentDescription = "Activity Log", tint = Color.White)
+                                Icon(Icons.Filled.History, contentDescription = "Transactions", tint = Color.White)
                             }
                             IconButton(
                                 onClick = { navController.navigate(com.daemon.expnesso.navigation.Screen.AddExpense.route) },

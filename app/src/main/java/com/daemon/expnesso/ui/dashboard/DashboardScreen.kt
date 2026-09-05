@@ -58,6 +58,8 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -146,18 +148,95 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
                 drawerContainerColor = PremiumSurface,
                 modifier = Modifier.width(300.dp)
             ) {
-                Spacer(modifier = Modifier.height(32.dp))
-                Text(
-                    text = "Expnesso",
-                    fontSize = 28.sp,
-                    fontWeight = FontWeight.Black,
-                    color = PrimaryAccent,
-                    modifier = Modifier.padding(horizontal = 24.dp)
-                )
-                Spacer(modifier = Modifier.height(32.dp))
+                val fbUser = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser
+                val photoUrl = fbUser?.photoUrl?.toString() ?: ""
+                val displayName = fbUser?.displayName ?: "User"
+                val email = fbUser?.email ?: ""
+                
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp, vertical = 32.dp)
+                ) {
+                    AsyncImage(
+                        model = photoUrl.ifEmpty { "https://ui-avatars.com/api/?name=$displayName" },
+                        contentDescription = "Profile Icon",
+                        modifier = Modifier
+                            .size(64.dp)
+                            .clip(CircleShape)
+                            .background(PremiumSurfaceVariant),
+                        contentScale = ContentScale.Crop
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(text = displayName, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                    Text(text = email, fontSize = 14.sp, color = TextSecondary)
+                }
+                
                 HorizontalDivider(color = PremiumSurfaceVariant)
-                Spacer(modifier = Modifier.height(16.dp))
-
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                NavigationDrawerItem(
+                    label = { Text("Create Book", color = TextPrimary) },
+                    icon = { Icon(Icons.Default.Add, contentDescription = null, tint = TextPrimary) },
+                    selected = false,
+                    onClick = { 
+                        scope.launch { drawerState.close() }
+                        showCreateBookDialog = true 
+                    },
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                    colors = NavigationDrawerItemDefaults.colors(unselectedContainerColor = Color.Transparent)
+                )
+                NavigationDrawerItem(
+                    label = { Text("Join Book", color = TextPrimary) },
+                    icon = { Icon(Icons.Default.Search, contentDescription = null, tint = TextPrimary) },
+                    selected = false,
+                    onClick = { 
+                        scope.launch { drawerState.close() }
+                        showJoinBookDialog = true 
+                    },
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                    colors = NavigationDrawerItemDefaults.colors(unselectedContainerColor = Color.Transparent)
+                )
+                
+                HorizontalDivider(color = PremiumSurfaceVariant, modifier = Modifier.padding(vertical = 8.dp))
+                
+                Text(
+                    text = "Your Books",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = TextSecondary,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
+                )
+                
+                LazyColumn(modifier = Modifier.weight(1f)) {
+                    items(allSessions) { book ->
+                        NavigationDrawerItem(
+                            label = { Text(book.name, color = TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                            icon = { 
+                                if (book.id == currentSessionId) {
+                                    Icon(Icons.Default.Star, contentDescription = "Current", tint = PrimaryAccent)
+                                } else {
+                                    Icon(Icons.Default.List, contentDescription = null, tint = TextSecondary)
+                                }
+                            },
+                            selected = book.id == currentSessionId,
+                            onClick = {
+                                scope.launch { drawerState.close() }
+                                if (book.id != currentSessionId) {
+                                    viewModel.switchSession(book.id)
+                                }
+                            },
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                            colors = NavigationDrawerItemDefaults.colors(
+                                selectedContainerColor = PremiumSurfaceVariant,
+                                unselectedContainerColor = Color.Transparent
+                            )
+                        )
+                    }
+                }
+                
+                HorizontalDivider(color = PremiumSurfaceVariant)
+                
                 NavigationDrawerItem(
                     label = { Text("Sign Out", fontSize = 16.sp) },
                     selected = false,
@@ -174,7 +253,7 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
                         unselectedTextColor = ErrorRed,
                         unselectedIconColor = ErrorRed
                     ),
-                    modifier = Modifier.padding(horizontal = 16.dp)
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp)
                 )
             }
         }
@@ -182,70 +261,83 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
         Scaffold(
             containerColor = PremiumBackground,
             floatingActionButton = {
-                Column(horizontalAlignment = Alignment.End) {
-                    AnimatedVisibility(
-                        visible = fabExpanded,
-                        enter = fadeIn() + slideInVertically(initialOffsetY = { 50 }),
-                        exit = fadeOut() + slideOutVertically(targetOffsetY = { 50 })
-                    ) {
-                    Column(
-                        horizontalAlignment = Alignment.End,
-                        verticalArrangement = Arrangement.spacedBy(16.dp),
-                        modifier = Modifier.padding(bottom = 16.dp)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("Join Book", color = Color.White, fontWeight = FontWeight.Medium)
-                            Spacer(modifier = Modifier.width(12.dp))
-                            SmallFloatingActionButton(
-                                onClick = {
-                                    fabExpanded = false
-                                    showJoinBookDialog = true
-                                },
-                                containerColor = PremiumSurfaceVariant,
-                                contentColor = Color.White
-                            ) {
-                                Icon(Icons.Default.Search, contentDescription = "Join Book")
-                            }
+                Box(contentAlignment = Alignment.BottomEnd) {
+                    val progress by androidx.compose.animation.core.animateFloatAsState(
+                        targetValue = if (fabExpanded) 1f else 0f,
+                        animationSpec = androidx.compose.animation.core.spring(
+                            dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
+                            stiffness = androidx.compose.animation.core.Spring.StiffnessLow
+                        ),
+                        label = "fabProgress"
+                    )
+
+                    val radius = 120f // We'll use dp multiplication later
+                    
+                    if (progress > 0f) {
+                        // Join Book (Left)
+                        FloatingActionButton(
+                            onClick = {
+                                fabExpanded = false
+                                showJoinBookDialog = true
+                            },
+                            modifier = Modifier
+                                .offset(x = (-(radius * progress)).dp, y = 0.dp)
+                                .alpha(progress)
+                                .size(48.dp),
+                            containerColor = Color(0xFF8B127C), // Dark Magenta
+                            contentColor = Color.White,
+                            shape = CircleShape
+                        ) {
+                            Icon(Icons.Default.Search, contentDescription = "Join Book")
                         }
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("Create Book", color = Color.White, fontWeight = FontWeight.Medium)
-                            Spacer(modifier = Modifier.width(12.dp))
-                            SmallFloatingActionButton(
-                                onClick = {
-                                    fabExpanded = false
-                                    showCreateBookDialog = true
-                                },
-                                containerColor = PremiumSurfaceVariant,
-                                contentColor = Color.White
-                            ) {
-                                Icon(Icons.Default.Person, contentDescription = "Create Book")
-                            }
+
+                        // Create Book (Diagonal)
+                        FloatingActionButton(
+                            onClick = {
+                                fabExpanded = false
+                                showCreateBookDialog = true
+                            },
+                            modifier = Modifier
+                                .offset(x = (-(radius * 0.7071f * progress)).dp, y = (-(radius * 0.7071f * progress)).dp)
+                                .alpha(progress)
+                                .size(48.dp),
+                            containerColor = Color(0xFF6A67CE), // Blue/Indigo
+                            contentColor = Color.White,
+                            shape = CircleShape
+                        ) {
+                            Icon(Icons.Default.Person, contentDescription = "Create Book")
                         }
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("Add Expense", color = Color.White, fontWeight = FontWeight.Medium)
-                            Spacer(modifier = Modifier.width(12.dp))
-                            SmallFloatingActionButton(
-                                onClick = {
-                                    fabExpanded = false
-                                    navController.navigate(com.daemon.expnesso.navigation.Screen.AddExpense.route)
-                                },
-                                containerColor = PrimaryAccent,
-                                contentColor = Color.Black
-                            ) {
-                                Icon(Icons.Default.Add, contentDescription = "Add Expense")
-                            }
+
+                        // Add Expense (Up)
+                        FloatingActionButton(
+                            onClick = {
+                                fabExpanded = false
+                                navController.navigate(com.daemon.expnesso.navigation.Screen.AddExpense.route)
+                            },
+                            modifier = Modifier
+                                .offset(x = 0.dp, y = (-(radius * progress)).dp)
+                                .alpha(progress)
+                                .size(48.dp),
+                            containerColor = Color(0xFFB554D8), // Purple
+                            contentColor = Color.White,
+                            shape = CircleShape
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = "Add Expense")
                         }
                     }
+
+                    // Main FAB
+                    FloatingActionButton(
+                        onClick = { fabExpanded = !fabExpanded },
+                        containerColor = if (fabExpanded) Color(0xFFFF6B4A) else PrimaryAccent,
+                        contentColor = if (fabExpanded) Color.White else Color.Black,
+                        shape = CircleShape,
+                        modifier = Modifier.rotate(progress * 135f)
+                    ) {
+                        Icon(if (fabExpanded) Icons.Default.Close else Icons.Default.Add, contentDescription = "Toggle Actions")
+                    }
                 }
-                FloatingActionButton(
-                    onClick = { fabExpanded = !fabExpanded },
-                    containerColor = if (fabExpanded) PremiumSurfaceVariant else PrimaryAccent,
-                    contentColor = if (fabExpanded) Color.White else Color.Black
-                ) {
-                    Icon(if (fabExpanded) Icons.Default.Close else Icons.Default.Add, contentDescription = "Toggle Actions")
-                }
-            }
-        },
+            },
         topBar = {
             TopAppBar(
                 title = {
@@ -336,8 +428,20 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
                 .nestedScroll(nestedScrollConnection)
         ) {
 
-            val globalTotalExpense = sessionUserExpenses.values.sum()
+            var globalTotalExpense = 0.0
             val globalNetBalance = sessionBalances.values.sumOf { it.first - it.second }
+            
+            allUserTransactions.forEach { tx ->
+                val paidBy = tx.paidByUid.ifEmpty { tx.addedByUid }
+                if (tx.splits.isNotEmpty()) {
+                    val mySplit = tx.splits[viewModel.currentUserId] ?: 0.0
+                    globalTotalExpense += mySplit
+                } else {
+                    if (paidBy == viewModel.currentUserId) {
+                        globalTotalExpense += tx.amount
+                    }
+                }
+            }
 
             Row(
                 modifier = Modifier
@@ -351,8 +455,8 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
                     horizontalAlignment = Alignment.Start
                 ) {
                     Text(
-                        text = "Total Expense",
-                        fontSize = 14.sp,
+                        text = "Your Total Expense",
+                        fontSize = 15.sp,
                         color = TextSecondary,
                         fontWeight = FontWeight.Medium
                     )
@@ -381,24 +485,29 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
                                 append(globalBalanceText)
                             }
                         },
-                        fontSize = 12.sp,
+                        fontSize = 13.sp,
                         fontWeight = FontWeight.Medium
                     )
                 }
                 
                 Spacer(modifier = Modifier.width(16.dp))
                 
-                Row(
-                    modifier = Modifier
-                        .clip(androidx.compose.foundation.shape.RoundedCornerShape(24.dp))
-                        .clickable { navController.navigate("expense_history") }
-                        .background(PremiumSurfaceVariant)
-                        .padding(horizontal = 16.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalAlignment = Alignment.End
                 ) {
-                    Icon(Icons.AutoMirrored.Filled.List, contentDescription = "Expense History", tint = Color.White, modifier = Modifier.size(18.dp))
-                    Text("History", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                    Row(
+                        modifier = Modifier
+                            .clip(androidx.compose.foundation.shape.RoundedCornerShape(24.dp))
+                            .clickable { navController.navigate("expense_analytics") }
+                            .background(PrimaryAccent.copy(alpha = 0.15f))
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(androidx.compose.material.icons.Icons.Default.Info, contentDescription = "Details", tint = PrimaryAccent, modifier = Modifier.size(16.dp))
+                        Text("Details", color = PrimaryAccent, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
             Spacer(modifier = Modifier.height(8.dp))
