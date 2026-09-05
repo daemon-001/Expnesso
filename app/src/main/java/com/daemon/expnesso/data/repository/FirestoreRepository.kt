@@ -135,6 +135,12 @@ class FirestoreRepository {
             ).await()
     }
 
+    suspend fun renameSession(sessionId: String, newName: String) {
+        db.collection("sessions").document(sessionId)
+            .update("name", newName)
+            .await()
+    }
+
     suspend fun addTransaction(transaction: Transaction) {
         val id = UUID.randomUUID().toString()
         val newTransaction = transaction.copy(id = id)

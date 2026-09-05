@@ -454,4 +454,19 @@ class DashboardViewModel(
             }
         }
     }
+
+    fun renameSession(sessionId: String, newName: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
+        if (newName.isBlank()) {
+            onError("Name cannot be empty")
+            return
+        }
+        viewModelScope.launch {
+            try {
+                firestoreRepository.renameSession(sessionId, newName)
+                onSuccess()
+            } catch (e: Exception) {
+                onError(e.message ?: "Failed to rename book")
+            }
+        }
+    }
 }

@@ -112,6 +112,8 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
     var showJoinBookDialog by remember { mutableStateOf(false) }
     var showDeleteBookDialog by remember { mutableStateOf(false) }
     var menuExpanded by remember { mutableStateOf(false) }
+    var bookToRename by remember { mutableStateOf<com.daemon.expnesso.data.model.Session?>(null) }
+    var bookToDelete by remember { mutableStateOf<com.daemon.expnesso.data.model.Session?>(null) }
 
     val scannerOptions = remember {
         GmsBarcodeScannerOptions.Builder()
@@ -213,10 +215,44 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
                         NavigationDrawerItem(
                             label = { Text(book.name, color = TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                             icon = { 
-                                if (book.id == currentSessionId) {
-                                    Icon(Icons.Default.Star, contentDescription = "Current", tint = PrimaryAccent)
-                                } else {
-                                    Icon(Icons.Default.List, contentDescription = null, tint = TextSecondary)
+                                Icon(Icons.Default.List, contentDescription = null, tint = TextSecondary)
+                            },
+                            badge = {
+                                var dropdownExpanded by remember { mutableStateOf(false) }
+                                Box {
+                                    IconButton(onClick = { dropdownExpanded = true }) {
+                                        Icon(Icons.Default.MoreVert, contentDescription = "More", tint = TextSecondary)
+                                    }
+                                    DropdownMenu(
+                                        expanded = dropdownExpanded,
+                                        onDismissRequest = { dropdownExpanded = false },
+                                        containerColor = PremiumSurfaceVariant
+                                    ) {
+                                        DropdownMenuItem(
+                                            text = { Text("Add Fav.", color = Color.White) },
+                                            onClick = {
+                                                dropdownExpanded = false
+                                                viewModel.setAsDefaultSession(book.id)
+                                                Toast.makeText(context, "${book.name} set as default", Toast.LENGTH_SHORT).show()
+                                            }
+                                        )
+                                        if (book.adminUid == viewModel.currentUserId) {
+                                            DropdownMenuItem(
+                                                text = { Text("Rename Book", color = Color.White) },
+                                                onClick = {
+                                                    dropdownExpanded = false
+                                                    bookToRename = book
+                                                }
+                                            )
+                                            DropdownMenuItem(
+                                                text = { Text("Delete Book", color = ErrorRed) },
+                                                onClick = {
+                                                    dropdownExpanded = false
+                                                    bookToDelete = book
+                                                }
+                                            )
+                                        }
+                                    }
                                 }
                             },
                             selected = book.id == currentSessionId,
@@ -1172,6 +1208,90 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
                 TextButton(onClick = { showDeleteBookDialog = false }) {
                     Text("Cancel", color = TextSecondary)
                 }
+            },
+            containerColor = PremiumSurface
+        )
+    }
+
+    bookToRename?.let { book ->
+        var newName by remember { mutableStateOf(book.name) }
+        AlertDialog(
+            onDismissRequest = { bookToRename = null },
+            title = { Text("Rename Book", color = TextPrimary, fontWeight = FontWeight.Bold) },
+            text = {
+                OutlinedTextField(
+                    value = newName,
+                    onValueChange = { newName = it },
+                    label = { Text("Book Name", color = TextSecondary) },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = PrimaryAccent,
+                        unfocusedBorderColor = PremiumSurfaceVariant,
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary
+                    ),
+                    singleLine = true
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.renameSession(
+                            sessionId = book.id,
+                            newName = newName,
+                            onSuccess = {
+                                bookToRename = null
+                                Toast.makeText(context, "Book renamed", Toast.LENGTH_SHORT).show()
+                            },
+                            onError = { err ->
+                                Toast.makeText(context, err, Toast.LENGTH_LONG).show()
+                            }
+                        )
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryAccent),
+                    enabled = newName.isNotBlank() && newName != book.name
+                ) {
+                    Text("Rename", color = Color.Black)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { bookToRename = null }) { Text("Cancel", color = TextSecondary) }
+            },
+            containerColor = PremiumSurface
+        )
+    }
+
+    bookToDelete?.let { book ->
+        AlertDialog(
+            onDismissRequest = { bookToDelete = null },
+            title = { Text("Delete Book", color = ErrorRed, fontWeight = FontWeight.Bold) },
+            text = {
+                Text(
+                    text = "Are you sure you want to delete '${book.name}'? This will move it to the bin, and you can restore it within 30 days.",
+                    color = TextPrimary
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.deleteSession(
+                            sessionId = book.id,
+                            adminUid = book.adminUid,
+                            onSuccess = {
+                                bookToDelete = null
+                                Toast.makeText(context, "Book deleted", Toast.LENGTH_SHORT).show()
+                            },
+                            onError = { err ->
+                                Toast.makeText(context, err, Toast.LENGTH_LONG).show()
+                            }
+                        )
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = ErrorRed)
+                ) {
+                    Text("Delete", color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { bookToDelete = null }) { Text("Cancel", color = TextSecondary) }
             },
             containerColor = PremiumSurface
         )
