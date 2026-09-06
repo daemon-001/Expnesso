@@ -58,6 +58,9 @@ class DashboardViewModel(
     private val _allDebts = MutableStateFlow<List<Debt>>(emptyList())
     val allDebts: StateFlow<List<Debt>> = _allDebts
 
+    private val _allKnownUsers = MutableStateFlow<Map<String, User>>(emptyMap())
+    val allKnownUsers: StateFlow<Map<String, User>> = _allKnownUsers
+
     private val _allUserTransactionsMap = MutableStateFlow<Map<String, List<Transaction>>>(emptyMap())
     val allUserTransactions: StateFlow<List<Transaction>> = _allUserTransactionsMap
         .map { it.values.flatten().sortedByDescending { tx -> tx.timestamp } }
@@ -73,6 +76,14 @@ class DashboardViewModel(
     // Map of sessionId -> Double (user expense)
     private val _sessionUserExpenses = MutableStateFlow<Map<String, Double>>(emptyMap())
     val sessionUserExpenses: StateFlow<Map<String, Double>> = _sessionUserExpenses
+
+    // Map of sessionId -> List of all Debts in that session
+    private val _sessionDebts = MutableStateFlow<Map<String, List<Debt>>>(emptyMap())
+    val sessionDebts: StateFlow<Map<String, List<Debt>>> = _sessionDebts
+
+    // Map of sessionId -> Map of userId to total amount spent (paid)
+    private val _sessionMemberSpending = MutableStateFlow<Map<String, Map<String, Double>>>(emptyMap())
+    val sessionMemberSpending: StateFlow<Map<String, Map<String, Double>>> = _sessionMemberSpending
 
     private var sessionJob: Job? = null
     private var transactionsJob: Job? = null
@@ -93,6 +104,14 @@ class DashboardViewModel(
                 firestoreRepository.getUserSessions(currentUserId).collect { sessions ->
                     _allSessions.value = sessions
                     calculateAllSessionBalances(sessions)
+                    
+                    val allUids = sessions.flatMap { it.memberUids }.distinct()
+                    if (allUids.isNotEmpty()) {
+                        try {
+                            val users = firestoreRepository.getUsers(allUids)
+                            _allKnownUsers.value = users.associateBy { it.uid }
+                        } catch (e: Exception) {}
+                    }
                     
                     if (_currentSessionId.value.isBlank() && sessions.isNotEmpty()) {
                         if (defaultSessionId != null && sessions.any { it.id == defaultSessionId }) {
@@ -227,6 +246,8 @@ class DashboardViewModel(
                 sessionBalanceJobs.remove(id)
                 _sessionBalances.value = _sessionBalances.value - id
                 _sessionUserExpenses.value = _sessionUserExpenses.value - id
+                _sessionDebts.value = _sessionDebts.value - id
+                _sessionMemberSpending.value = _sessionMemberSpending.value - id
                 _allUserTransactionsMap.value = _allUserTransactionsMap.value - id
             }
         }
@@ -238,13 +259,18 @@ class DashboardViewModel(
                     try {
                         firestoreRepository.getSessionTransactions(session.id).collect { txList ->
                             val balances = mutableMapOf<String, Double>()
-                            session.memberUids.forEach { balances[it] = 0.0 }
+                            val spending = mutableMapOf<String, Double>()
+                            session.memberUids.forEach { 
+                                balances[it] = 0.0 
+                                spending[it] = 0.0
+                            }
                             
                             var sessionUserExpense = 0.0
 
                             txList.forEach { tx ->
                                 val paidBy = tx.paidByUid.ifEmpty { tx.addedByUid }
                                 balances[paidBy] = (balances[paidBy] ?: 0.0) + tx.amount
+                                spending[paidBy] = (spending[paidBy] ?: 0.0) + tx.amount
 
                                 if (tx.splits.isNotEmpty()) {
                                     tx.splits.forEach { (uid, amountOwed) ->
@@ -290,6 +316,8 @@ class DashboardViewModel(
                             
                             _sessionBalances.value = _sessionBalances.value + (session.id to Pair(willGet, willPay))
                             _sessionUserExpenses.value = _sessionUserExpenses.value + (session.id to sessionUserExpense)
+                            _sessionDebts.value = _sessionDebts.value + (session.id to allDebts)
+                            _sessionMemberSpending.value = _sessionMemberSpending.value + (session.id to spending)
                             _allUserTransactionsMap.value = _allUserTransactionsMap.value + (session.id to userTxs)
                         }
                     } catch (e: Exception) {

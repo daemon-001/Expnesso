@@ -7,6 +7,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -16,6 +17,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -23,33 +26,48 @@ import androidx.compose.ui.res.painterResource
 import androidx.navigation.NavController
 import com.daemon.expnesso.R
 import com.daemon.expnesso.data.repository.AuthRepository
+import com.daemon.expnesso.data.repository.FirestoreRepository
 import com.daemon.expnesso.navigation.Screen
 import com.daemon.expnesso.ui.theme.PrimaryAccent
 import com.daemon.expnesso.ui.theme.PremiumBackground
 import com.daemon.expnesso.ui.theme.SecondaryAccent
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.common.api.ApiException
+import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.GoogleAuthProvider
+import com.google.firebase.auth.UserProfileChangeRequest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoginScreen(navController: NavController) {
     val context = LocalContext.current
     val authRepository = remember { AuthRepository(context) }
+    val firestoreRepository = remember { FirestoreRepository() }
     val scope = rememberCoroutineScope()
+    
     var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    
+    var isLoginMode by remember { mutableStateOf(true) }
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var name by remember { mutableStateOf("") }
+
+    var showGoogleNameDialog by remember { mutableStateOf(false) }
+    var googleName by remember { mutableStateOf("") }
+    var pendingGoogleUser by remember { mutableStateOf<FirebaseUser?>(null) }
 
     LaunchedEffect(Unit) {
         val currentUser = authRepository.currentUser
         if (currentUser != null) {
-            val firestoreRepository = com.daemon.expnesso.data.repository.FirestoreRepository()
-            // Make sure the user document exists!
-            firestoreRepository.saveUser(currentUser)
-            
             val userDoc = firestoreRepository.getUser(currentUser.uid)
-            var targetSessionId = userDoc?.defaultSessionId
+            if (userDoc == null) {
+                firestoreRepository.saveUser(currentUser)
+            }
+            val finalUserDoc = firestoreRepository.getUser(currentUser.uid)
+            var targetSessionId = finalUserDoc?.defaultSessionId
             if (targetSessionId.isNullOrEmpty()) {
                 targetSessionId = ""
             }
@@ -72,15 +90,20 @@ fun LoginScreen(navController: NavController) {
                         isLoading = true
                         val authResult = authRepository.firebaseAuth.signInWithCredential(credential).await()
                         authResult.user?.let { firebaseUser ->
-                            val firestoreRepository = com.daemon.expnesso.data.repository.FirestoreRepository()
-                            firestoreRepository.saveUser(firebaseUser)
                             val userDoc = firestoreRepository.getUser(firebaseUser.uid)
-                            var targetSessionId = userDoc?.defaultSessionId
-                            if (targetSessionId.isNullOrEmpty()) {
-                                targetSessionId = ""
-                            }
-                            navController.navigate(Screen.Dashboard.createRoute(targetSessionId)) {
-                                popUpTo(Screen.Login.route) { inclusive = true }
+                            if (userDoc == null) {
+                                pendingGoogleUser = firebaseUser
+                                googleName = firebaseUser.displayName ?: ""
+                                showGoogleNameDialog = true
+                                isLoading = false
+                            } else {
+                                var targetSessionId = userDoc.defaultSessionId
+                                if (targetSessionId.isNullOrEmpty()) {
+                                    targetSessionId = ""
+                                }
+                                navController.navigate(Screen.Dashboard.createRoute(targetSessionId)) {
+                                    popUpTo(Screen.Login.route) { inclusive = true }
+                                }
                             }
                         } ?: run {
                             throw Exception("Failed to get Firebase User")
@@ -100,6 +123,59 @@ fun LoginScreen(navController: NavController) {
         }
     }
 
+    if (showGoogleNameDialog && pendingGoogleUser != null) {
+        AlertDialog(
+            onDismissRequest = { /* Require name */ },
+            title = { Text("Welcome to Expnesso!") },
+            text = {
+                Column {
+                    Text("Please enter your name to continue:")
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = googleName,
+                        onValueChange = { googleName = it },
+                        label = { Text("Name") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (googleName.isNotBlank()) {
+                            scope.launch {
+                                isLoading = true
+                                showGoogleNameDialog = false
+                                try {
+                                    val profileUpdates = UserProfileChangeRequest.Builder()
+                                        .setDisplayName(googleName)
+                                        .build()
+                                    pendingGoogleUser!!.updateProfile(profileUpdates).await()
+                                    firestoreRepository.saveUser(pendingGoogleUser!!, googleName)
+                                    
+                                    val userDoc = firestoreRepository.getUser(pendingGoogleUser!!.uid)
+                                    var targetSessionId = userDoc?.defaultSessionId
+                                    if (targetSessionId.isNullOrEmpty()) {
+                                        targetSessionId = ""
+                                    }
+                                    navController.navigate(Screen.Dashboard.createRoute(targetSessionId)) {
+                                        popUpTo(Screen.Login.route) { inclusive = true }
+                                    }
+                                } catch (e: Exception) {
+                                    errorMessage = e.localizedMessage
+                                    isLoading = false
+                                }
+                            }
+                        }
+                    }
+                ) {
+                    Text("Save")
+                }
+            }
+        )
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -112,7 +188,9 @@ fun LoginScreen(navController: NavController) {
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(32.dp)
+            modifier = Modifier
+                .padding(32.dp)
+                .fillMaxWidth()
         ) {
             Text(
                 text = "Expnesso",
@@ -125,12 +203,141 @@ fun LoginScreen(navController: NavController) {
                 text = "Split expenses. Sync beautifully.",
                 fontSize = 16.sp,
                 color = Color.LightGray,
-                modifier = Modifier.padding(bottom = 64.dp)
+                modifier = Modifier.padding(bottom = 32.dp)
             )
 
             if (isLoading) {
                 CircularProgressIndicator(color = SecondaryAccent)
             } else {
+                if (!isLoginMode) {
+                    OutlinedTextField(
+                        value = name,
+                        onValueChange = { name = it },
+                        label = { Text("Name", color = Color.LightGray) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedBorderColor = PrimaryAccent,
+                            unfocusedBorderColor = Color.Gray,
+                        ),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+                    )
+                }
+
+                OutlinedTextField(
+                    value = email,
+                    onValueChange = { email = it },
+                    label = { Text("Email", color = Color.LightGray) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        focusedBorderColor = PrimaryAccent,
+                        unfocusedBorderColor = Color.Gray,
+                    ),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+                )
+
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = { Text("Password", color = Color.LightGray) },
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        focusedBorderColor = PrimaryAccent,
+                        unfocusedBorderColor = Color.Gray,
+                    ),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)
+                )
+
+                Button(
+                    onClick = {
+                        if (email.isBlank() || password.isBlank() || (!isLoginMode && name.isBlank())) {
+                            errorMessage = "Please fill all fields"
+                            return@Button
+                        }
+                        isLoading = true
+                        errorMessage = null
+                        scope.launch {
+                            try {
+                                if (isLoginMode) {
+                                    val authResult = authRepository.firebaseAuth.signInWithEmailAndPassword(email, password).await()
+                                    val user = authResult.user
+                                    if (user != null) {
+                                        val userDoc = firestoreRepository.getUser(user.uid)
+                                        var targetSessionId = userDoc?.defaultSessionId
+                                        if (targetSessionId.isNullOrEmpty()) {
+                                            targetSessionId = ""
+                                        }
+                                        navController.navigate(Screen.Dashboard.createRoute(targetSessionId)) {
+                                            popUpTo(Screen.Login.route) { inclusive = true }
+                                        }
+                                    }
+                                } else {
+                                    val authResult = authRepository.firebaseAuth.createUserWithEmailAndPassword(email, password).await()
+                                    val user = authResult.user
+                                    if (user != null) {
+                                        val profileUpdates = UserProfileChangeRequest.Builder()
+                                            .setDisplayName(name)
+                                            .build()
+                                        user.updateProfile(profileUpdates).await()
+                                        firestoreRepository.saveUser(user, name)
+                                        
+                                        val userDoc = firestoreRepository.getUser(user.uid)
+                                        var targetSessionId = userDoc?.defaultSessionId
+                                        if (targetSessionId.isNullOrEmpty()) {
+                                            targetSessionId = ""
+                                        }
+                                        navController.navigate(Screen.Dashboard.createRoute(targetSessionId)) {
+                                            popUpTo(Screen.Login.route) { inclusive = true }
+                                        }
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                errorMessage = e.localizedMessage
+                                isLoading = false
+                            }
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp)
+                        .clip(RoundedCornerShape(12.dp)),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = PrimaryAccent,
+                        contentColor = Color.Black
+                    )
+                ) {
+                    Text(if (isLoginMode) "Login" else "Sign Up", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                }
+
+                TextButton(onClick = { 
+                    isLoginMode = !isLoginMode 
+                    errorMessage = null
+                }) {
+                    Text(
+                        text = if (isLoginMode) "Don't have an account? Sign up" else "Already have an account? Login",
+                        color = PrimaryAccent
+                    )
+                }
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    HorizontalDivider(modifier = Modifier.weight(1f), color = Color.Gray)
+                    Text(" OR ", color = Color.Gray, modifier = Modifier.padding(horizontal = 8.dp))
+                    HorizontalDivider(modifier = Modifier.weight(1f), color = Color.Gray)
+                }
+
                 Button(
                     onClick = {
                         isLoading = true
@@ -140,10 +347,10 @@ fun LoginScreen(navController: NavController) {
                     },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(56.dp)
-                        .clip(RoundedCornerShape(16.dp)),
+                        .height(50.dp)
+                        .clip(RoundedCornerShape(12.dp)),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = PrimaryAccent,
+                        containerColor = Color.White,
                         contentColor = Color.Black
                     )
                 ) {
@@ -154,7 +361,7 @@ fun LoginScreen(navController: NavController) {
                         tint = Color.Unspecified
                     )
                     Spacer(modifier = Modifier.width(12.dp))
-                    Text("Continue with Google", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                    Text("Continue with Google", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
 

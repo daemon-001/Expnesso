@@ -16,14 +16,14 @@ import java.util.UUID
 class FirestoreRepository {
     private val db = FirebaseFirestore.getInstance()
 
-    suspend fun saveUser(firebaseUser: FirebaseUser) {
+    suspend fun saveUser(firebaseUser: FirebaseUser, customName: String? = null) {
         val userRef = db.collection("users").document(firebaseUser.uid)
         val snapshot = userRef.get().await()
         if (!snapshot.exists()) {
             val user = User(
                 uid = firebaseUser.uid,
                 email = firebaseUser.email ?: "",
-                name = firebaseUser.displayName ?: "",
+                name = customName ?: firebaseUser.displayName ?: "",
                 photoUrl = firebaseUser.photoUrl?.toString() ?: ""
             )
             userRef.set(user).await()

@@ -89,6 +89,10 @@ import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
 import java.text.SimpleDateFormat
 import java.util.Locale
 
+enum class DashboardTab {
+    Books, Activity, Groups, SplitStats
+}
+
 @OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel) {
@@ -102,11 +106,11 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
     val currentSessionId by viewModel.currentSessionId.collectAsState()
     val allUserTransactions by viewModel.allUserTransactions.collectAsState()
     val sessionMembers by viewModel.sessionMembers.collectAsState()
+    val allKnownUsers by viewModel.allKnownUsers.collectAsState()
     val netBalances by viewModel.netBalances.collectAsState()
     val isNetworkAvailable by com.daemon.expnesso.ui.utils.rememberNetworkStatus()
 
-    // Dialog States
-    var fabExpanded by remember { mutableStateOf(false) }
+    var selectedTab by remember { mutableStateOf(DashboardTab.Activity) }
     var showInviteDialog by remember { mutableStateOf(false) }
     var showCreateBookDialog by remember { mutableStateOf(false) }
     var showJoinBookDialog by remember { mutableStateOf(false) }
@@ -296,102 +300,32 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
     ) {
         Scaffold(
             containerColor = PremiumBackground,
-            floatingActionButton = {
-                Box(contentAlignment = Alignment.BottomEnd) {
-                    val progress by androidx.compose.animation.core.animateFloatAsState(
-                        targetValue = if (fabExpanded) 1f else 0f,
-                        animationSpec = androidx.compose.animation.core.spring(
-                            dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
-                            stiffness = androidx.compose.animation.core.Spring.StiffnessLow
-                        ),
-                        label = "fabProgress"
-                    )
-
-                    val radius = 120f // We'll use dp multiplication later
-                    
-                    if (progress > 0f) {
-                        // Join Book (Left)
-                        FloatingActionButton(
-                            onClick = {
-                                fabExpanded = false
-                                showJoinBookDialog = true
-                            },
-                            modifier = Modifier
-                                .offset(x = (-(radius * progress)).dp, y = 0.dp)
-                                .alpha(progress)
-                                .size(48.dp),
-                            containerColor = Color(0xFF8B127C), // Dark Magenta
-                            contentColor = Color.White,
-                            shape = CircleShape
-                        ) {
-                            Icon(Icons.Default.Search, contentDescription = "Join Book")
-                        }
-
-                        // Create Book (Diagonal)
-                        FloatingActionButton(
-                            onClick = {
-                                fabExpanded = false
-                                showCreateBookDialog = true
-                            },
-                            modifier = Modifier
-                                .offset(x = (-(radius * 0.7071f * progress)).dp, y = (-(radius * 0.7071f * progress)).dp)
-                                .alpha(progress)
-                                .size(48.dp),
-                            containerColor = Color(0xFF6A67CE), // Blue/Indigo
-                            contentColor = Color.White,
-                            shape = CircleShape
-                        ) {
-                            Icon(Icons.Default.Person, contentDescription = "Create Book")
-                        }
-
-                        // Add Expense (Up)
-                        FloatingActionButton(
-                            onClick = {
-                                fabExpanded = false
-                                navController.navigate(com.daemon.expnesso.navigation.Screen.AddExpense.route)
-                            },
-                            modifier = Modifier
-                                .offset(x = 0.dp, y = (-(radius * progress)).dp)
-                                .alpha(progress)
-                                .size(48.dp),
-                            containerColor = Color(0xFFB554D8), // Purple
-                            contentColor = Color.White,
-                            shape = CircleShape
-                        ) {
-                            Icon(Icons.Default.Add, contentDescription = "Add Expense")
-                        }
-                    }
-
-                    // Main FAB
-                    FloatingActionButton(
-                        onClick = { fabExpanded = !fabExpanded },
-                        containerColor = if (fabExpanded) Color(0xFFFF6B4A) else PrimaryAccent,
-                        contentColor = if (fabExpanded) Color.White else Color.Black,
-                        shape = CircleShape,
-                        modifier = Modifier.rotate(progress * 135f)
-                    ) {
-                        Icon(if (fabExpanded) Icons.Default.Close else Icons.Default.Add, contentDescription = "Toggle Actions")
-                    }
-                }
+            bottomBar = {
+                com.daemon.expnesso.ui.dashboard.DashboardBottomBar(
+                    selectedTab = selectedTab,
+                    onTabSelected = { selectedTab = it },
+                    onAddClick = { navController.navigate(com.daemon.expnesso.navigation.Screen.AddExpense.route) }
+                )
             },
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = "Expnesso",
-                        fontWeight = FontWeight.Bold,
-                        color = TextPrimary,
-                        fontSize = 20.sp
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = { scope.launch { drawerState.open() } }) {
-                        Icon(Icons.Default.Menu, contentDescription = "Menu", tint = TextPrimary)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = PremiumBackground)
-            )
-        }
+            topBar = {
+                TopAppBar(
+                    title = {
+                        Text(
+                            text = "Expnesso",
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary,
+                            fontSize = 20.sp
+                        )
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                            Icon(Icons.Default.Menu, contentDescription = "Menu", tint = TextPrimary)
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = PremiumBackground)
+                )
+            }
+
     ) { padding ->
         val sessionBalances by viewModel.sessionBalances.collectAsState()
         val sessionUserExpenses by viewModel.sessionUserExpenses.collectAsState()
@@ -402,12 +336,18 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
         val totalWillGet = myCredits.sumOf { it.amount }
         val totalWillPay = myDebts.sumOf { it.amount }
 
-        val listState = rememberLazyListState()
-        val headerState = remember { androidx.compose.animation.core.MutableTransitionState(true) }
-        var isConsumingCurrentGesture by remember { mutableStateOf(false) }
+        val transactions by viewModel.transactions.collectAsState(initial = emptyList())
+        val allSessions by viewModel.allSessions.collectAsState()
+        val allKnownUsers by viewModel.allKnownUsers.collectAsState()
+        
+        when (selectedTab) {
+            DashboardTab.Activity -> {
+                val listState = rememberLazyListState()
+                val headerState = remember { androidx.compose.animation.core.MutableTransitionState(true) }
+                var isConsumingCurrentGesture by remember { mutableStateOf(false) }
 
-        val nestedScrollConnection = remember {
-            object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
+                val nestedScrollConnection = remember {
+                    object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
                 override fun onPreScroll(available: androidx.compose.ui.geometry.Offset, source: androidx.compose.ui.input.nestedscroll.NestedScrollSource): androidx.compose.ui.geometry.Offset {
                     if (available.y < 0) {
                         if (headerState.targetState) {
@@ -479,9 +419,25 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
                 }
             }
 
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
+            androidx.compose.animation.AnimatedVisibility(
+                visible = headerState.targetState,
+                enter = androidx.compose.animation.expandVertically(
+                    animationSpec = androidx.compose.animation.core.spring(
+                        dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy,
+                        stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow
+                    )
+                ),
+                exit = androidx.compose.animation.shrinkVertically(
+                    animationSpec = androidx.compose.animation.core.spring(
+                        dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy,
+                        stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow
+                    )
+                )
+            ) {
+                Column {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
@@ -765,22 +721,7 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
 
 
             // Collapsible Mid Section
-            androidx.compose.animation.AnimatedVisibility(
-                visible = headerState.targetState,
-                enter = androidx.compose.animation.expandVertically(
-                    animationSpec = androidx.compose.animation.core.spring(
-                        dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy,
-                        stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow
-                    )
-                ),
-                exit = androidx.compose.animation.shrinkVertically(
-                    animationSpec = androidx.compose.animation.core.spring(
-                        dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy,
-                        stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow
-                    )
-                )
-            ) {
-                Column(modifier = Modifier
+            Column(modifier = Modifier
                     .padding(horizontal = 16.dp)
                     .pointerInput(Unit) {
                         detectVerticalDragGestures { _, dragAmount ->
@@ -898,10 +839,12 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
                         }
                     }
                 }
-            }
                 }
+                }
+            }
 
             // Scrollable list below the fixed card
+            val sdf = remember { SimpleDateFormat("MMM dd, yyyy", Locale.getDefault()) }
             LazyColumn(
                 state = listState,
                 modifier = Modifier
@@ -910,35 +853,74 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
                 contentPadding = PaddingValues(bottom = 80.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-            stickyHeader {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(PremiumBackground)
-                        .padding(vertical = 12.dp)
-                ) {
-                    Text("Your Books", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+                stickyHeader {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(PremiumBackground)
+                            .padding(vertical = 12.dp)
+                    ) {
+                        Text("Recent Transactions", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+                    }
                 }
-            }
 
-            items(allSessions) { s ->
-                val balances = sessionBalances[s.id] ?: Pair(0.0, 0.0)
-                val sessionTx = allUserTransactions.filter { it.sessionId == s.id }
-                BookItem(
-                    session = s,
-                    expense = sessionUserExpenses[s.id] ?: 0.0,
-                    willGet = balances.first,
-                    willPay = balances.second,
-                    isSelected = s.id == session?.id,
-                    isDefault = s.id == currentUser?.defaultSessionId,
-                    hasPendingSync = sessionTx.any { !it.isSynced },
-                    hasTransactions = sessionTx.isNotEmpty(),
-                    isNetworkAvailable = isNetworkAvailable,
-                    onClick = { viewModel.switchSession(s.id) }
+                if (transactions.isEmpty()) {
+                    item {
+                        Text(
+                            "No transactions yet.",
+                            color = TextSecondary,
+                            fontSize = 14.sp,
+                            modifier = Modifier.padding(vertical = 16.dp)
+                        )
+                    }
+                } else {
+                    items(transactions, key = { it.id }) { tx ->
+                        TransactionItem(
+                            transaction = tx,
+                            paidBy = allKnownUsers[tx.paidByUid.ifEmpty { tx.addedByUid }],
+                            currentUserId = viewModel.currentUserId,
+                            adminUid = allSessions.find { it.id == tx.sessionId }?.adminUid,
+                            sessionMembers = allKnownUsers,
+                            sdf = sdf,
+                            onDelete = {
+                                viewModel.deleteTransaction(tx.id, allSessions.find { it.id == tx.sessionId }?.adminUid ?: "", tx.addedByUid)
+                            }
+                        )
+                    }
+                }
+            } // End of LazyColumn
+        } // End of Column
+    } // End of Activity Tab
+            DashboardTab.Books -> {
+                com.daemon.expnesso.ui.dashboard.BooksTabContent(
+                    allSessions = allSessions,
+                    currentSessionId = currentSessionId,
+                    onSessionClick = { session ->
+                        viewModel.switchSession(session.id)
+                        selectedTab = DashboardTab.Activity
+                    },
+                    padding = padding
                 )
             }
+            DashboardTab.Groups -> {
+                com.daemon.expnesso.ui.dashboard.GroupsTabContent(
+                    allSessions = allSessions,
+                    allKnownUsers = allKnownUsers,
+                    padding = padding
+                )
             }
-        } // End of Column
+            DashboardTab.SplitStats -> {
+                com.daemon.expnesso.ui.dashboard.SplitStatsTabContent(
+                    allSessions = allSessions,
+                    allKnownUsers = allKnownUsers,
+                    padding = padding,
+                    viewModel = viewModel,
+                    onSessionClick = { s ->
+                        navController.navigate(com.daemon.expnesso.navigation.Screen.BookDetails.createRoute(s.id))
+                    }
+                )
+            }
+        } // End of when
     }
     }
 
@@ -1210,7 +1192,7 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
                 }
             },
             containerColor = PremiumSurface
-        )
+         )
     }
 
     bookToRename?.let { book ->
@@ -1296,7 +1278,7 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
             containerColor = PremiumSurface
         )
     }
-} // Closes ModalNavigationDrawer
+}
 @Composable
 fun BookItem(
     session: Session,
