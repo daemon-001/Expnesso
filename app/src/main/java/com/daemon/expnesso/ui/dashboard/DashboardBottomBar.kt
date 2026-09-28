@@ -12,9 +12,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -34,8 +37,9 @@ fun DashboardBottomBar(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(72.dp)
             .background(bottomBarColor)
+            .navigationBarsPadding()
+            .height(72.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxSize(),
@@ -44,6 +48,7 @@ fun DashboardBottomBar(
         ) {
             // Home (Activity) Tab
             BottomBarItem(
+                modifier = Modifier.weight(1f),
                 icon = Icons.Default.Dashboard,
                 label = "Home",
                 isSelected = selectedTab == DashboardTab.Activity,
@@ -54,6 +59,7 @@ fun DashboardBottomBar(
 
             // Books Tab
             BottomBarItem(
+                modifier = Modifier.weight(1f),
                 icon = Icons.Default.LibraryBooks,
                 label = "Books",
                 isSelected = selectedTab == DashboardTab.Books,
@@ -65,16 +71,26 @@ fun DashboardBottomBar(
             // Spacer for center FAB
             Spacer(modifier = Modifier.width(64.dp))
 
-            // Groups Tab has been merged into Books
-
             // Split Stats Tab
             BottomBarItem(
+                modifier = Modifier.weight(1f),
                 icon = Icons.Default.PieChart,
                 label = "Split Stats",
                 isSelected = selectedTab == DashboardTab.SplitStats,
                 activeColor = activeColor,
                 inactiveColor = inactiveColor,
                 onClick = { onTabSelected(DashboardTab.SplitStats) }
+            )
+
+            // History Tab
+            BottomBarItem(
+                modifier = Modifier.weight(1f),
+                icon = Icons.Default.History,
+                label = "History",
+                isSelected = selectedTab == DashboardTab.History,
+                activeColor = activeColor,
+                inactiveColor = inactiveColor,
+                onClick = { onTabSelected(DashboardTab.History) }
             )
         }
 
@@ -86,6 +102,7 @@ fun DashboardBottomBar(
                 .size(64.dp)
                 .shadow(8.dp, CircleShape)
                 .background(activeColor, CircleShape)
+                .clip(CircleShape)
                 .clickable(onClick = onAddClick),
             contentAlignment = Alignment.Center
         ) {
@@ -101,6 +118,7 @@ fun DashboardBottomBar(
 
 @Composable
 fun BottomBarItem(
+    modifier: Modifier = Modifier,
     icon: ImageVector,
     label: String,
     isSelected: Boolean,
@@ -108,12 +126,14 @@ fun BottomBarItem(
     inactiveColor: Color,
     onClick: () -> Unit
 ) {
-    val color = if (isSelected) activeColor else inactiveColor
+    val color by androidx.compose.animation.animateColorAsState(if (isSelected) activeColor else inactiveColor, label = "color")
+    val scale by androidx.compose.animation.core.animateFloatAsState(if (isSelected) 1.15f else 1.0f, label = "scale")
     
     Column(
-        modifier = Modifier
+        modifier = modifier
+            .clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
             .clickable(onClick = onClick)
-            .padding(8.dp),
+            .padding(vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
@@ -121,7 +141,9 @@ fun BottomBarItem(
             imageVector = icon,
             contentDescription = label,
             tint = color,
-            modifier = Modifier.size(24.dp)
+            modifier = Modifier
+                .size(24.dp)
+                .scale(scale)
         )
         Spacer(modifier = Modifier.height(4.dp))
         Text(

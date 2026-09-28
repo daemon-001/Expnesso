@@ -45,6 +45,9 @@ class DashboardViewModel(
     private val _sessionMembers = MutableStateFlow<Map<String, User>>(emptyMap())
     val sessionMembers: StateFlow<Map<String, User>> = _sessionMembers
 
+    private val _defaultSessionId = MutableStateFlow<String?>(null)
+    val defaultSessionId: StateFlow<String?> = _defaultSessionId
+
     // Net balance for each user. Positive = they are owed. Negative = they owe.
     private val _netBalances = MutableStateFlow<Map<String, Double>>(emptyMap())
     val netBalances: StateFlow<Map<String, Double>> = _netBalances
@@ -99,6 +102,7 @@ class DashboardViewModel(
         viewModelScope.launch {
             val user = try { firestoreRepository.getUser(currentUserId) } catch (e: Exception) { null }
             val defaultSessionId = user?.defaultSessionId
+            _defaultSessionId.value = defaultSessionId
             
             try {
                 firestoreRepository.getUserSessions(currentUserId).collect { sessions ->
@@ -125,6 +129,15 @@ class DashboardViewModel(
             } catch (e: Exception) {
                 // Ignore flow cancellation or permission denied on logout
             }
+        }
+    }
+
+    fun setDefaultSession(sessionId: String) {
+        viewModelScope.launch {
+            try {
+                firestoreRepository.setDefaultSession(currentUserId, sessionId)
+                _defaultSessionId.value = sessionId
+            } catch (e: Exception) {}
         }
     }
 

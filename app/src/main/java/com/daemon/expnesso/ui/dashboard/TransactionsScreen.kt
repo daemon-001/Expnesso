@@ -121,6 +121,7 @@ fun TransactionItem(
     adminUid: String?,
     sessionMembers: Map<String, User>,
     sdf: SimpleDateFormat,
+    sessionName: String? = null,
     onDelete: () -> Unit
 ) {
     val canDelete = currentUserId == adminUid || currentUserId == transaction.addedByUid
@@ -174,7 +175,11 @@ fun TransactionItem(
                 Spacer(modifier = Modifier.width(16.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(transaction.description, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Medium)
-                    Text("${sdf.format(transaction.timestamp.toDate())} • Paid by ${paidBy?.name ?: "Unknown"}", color = TextSecondary, fontSize = 12.sp)
+                    
+                    val formattedDate = androidx.compose.runtime.remember(transaction.timestamp) { sdf.format(transaction.timestamp.toDate()) }
+                    val sessionText = if (sessionName != null) " • Book: $sessionName" else ""
+                    
+                    Text("$formattedDate • Paid by ${paidBy?.name ?: "Unknown"}$sessionText", color = TextSecondary, fontSize = 12.sp)
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (transaction.isSynced) {

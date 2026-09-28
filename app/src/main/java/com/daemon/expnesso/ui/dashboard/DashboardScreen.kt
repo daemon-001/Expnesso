@@ -90,7 +90,7 @@ import java.text.SimpleDateFormat
 import java.util.Locale
 
 enum class DashboardTab {
-    Books, Activity, SplitStats
+    Books, Activity, History, SplitStats
 }
 
 @OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
@@ -104,6 +104,7 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
     val allSessions by viewModel.allSessions.collectAsState()
     val isSessionsLoaded by viewModel.isSessionsLoaded.collectAsState()
     val currentSessionId by viewModel.currentSessionId.collectAsState()
+    val defaultSessionId by viewModel.defaultSessionId.collectAsState()
     val allUserTransactions by viewModel.allUserTransactions.collectAsState()
     val sessionMembers by viewModel.sessionMembers.collectAsState()
     val allKnownUsers by viewModel.allKnownUsers.collectAsState()
@@ -219,7 +220,11 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
                         NavigationDrawerItem(
                             label = { Text(book.name, color = TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                             icon = { 
-                                Icon(Icons.Default.List, contentDescription = null, tint = TextSecondary)
+                                if (book.id == defaultSessionId) {
+                                    Icon(Icons.Filled.Star, contentDescription = "Default", tint = PrimaryAccent)
+                                } else {
+                                    Icon(Icons.AutoMirrored.Filled.List, contentDescription = null, tint = TextSecondary)
+                                }
                             },
                             badge = {
                                 var dropdownExpanded by remember { mutableStateOf(false) }
@@ -232,14 +237,16 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
                                         onDismissRequest = { dropdownExpanded = false },
                                         containerColor = PremiumSurfaceVariant
                                     ) {
-                                        DropdownMenuItem(
-                                            text = { Text("Add Fav.", color = Color.White) },
-                                            onClick = {
-                                                dropdownExpanded = false
-                                                viewModel.setAsDefaultSession(book.id)
-                                                Toast.makeText(context, "${book.name} set as default", Toast.LENGTH_SHORT).show()
-                                            }
-                                        )
+                                        if (book.id != defaultSessionId) {
+                                            DropdownMenuItem(
+                                                text = { Text("Add Fav.", color = Color.White) },
+                                                onClick = {
+                                                    dropdownExpanded = false
+                                                    viewModel.setDefaultSession(book.id)
+                                                    android.widget.Toast.makeText(context, "${book.name} set as default", android.widget.Toast.LENGTH_SHORT).show()
+                                                }
+                                            )
+                                        }
                                         if (book.adminUid == viewModel.currentUserId) {
                                             DropdownMenuItem(
                                                 text = { Text("Rename Book", color = Color.White) },
@@ -342,7 +349,6 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
         
         when (selectedTab) {
             DashboardTab.Activity -> {
-                val listState = rememberLazyListState()
                 val headerState = remember { androidx.compose.animation.core.MutableTransitionState(true) }
                 var isConsumingCurrentGesture by remember { mutableStateOf(false) }
 
@@ -394,7 +400,6 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
 
         LaunchedEffect(session?.id) {
             headerState.targetState = true
-            listState.scrollToItem(0)
         }
 
         Column(
@@ -843,64 +848,25 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
                 }
             }
 
-            // Scrollable list below the fixed card
-            val sdf = remember { SimpleDateFormat("MMM dd, yyyy", Locale.getDefault()) }
-            LazyColumn(
-                state = listState,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 16.dp),
-                contentPadding = PaddingValues(bottom = 80.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                stickyHeader {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(PremiumBackground)
-                            .padding(vertical = 12.dp)
-                    ) {
-                        Text("Recent Transactions", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
-                    }
-                }
-
-                if (transactions.isEmpty()) {
-                    item {
-                        Text(
-                            "No transactions yet.",
-                            color = TextSecondary,
-                            fontSize = 14.sp,
-                            modifier = Modifier.padding(vertical = 16.dp)
-                        )
-                    }
-                } else {
-                    items(transactions, key = { it.id }) { tx ->
-                        TransactionItem(
-                            transaction = tx,
-                            paidBy = allKnownUsers[tx.paidByUid.ifEmpty { tx.addedByUid }],
-                            currentUserId = viewModel.currentUserId,
-                            adminUid = allSessions.find { it.id == tx.sessionId }?.adminUid,
-                            sessionMembers = allKnownUsers,
-                            sdf = sdf,
-                            onDelete = {
-                                viewModel.deleteTransaction(tx.id, allSessions.find { it.id == tx.sessionId }?.adminUid ?: "", tx.addedByUid)
-                            }
-                        )
-                    }
-                }
-            } // End of LazyColumn
+            Spacer(modifier = Modifier.weight(1f))
         } // End of Column
     } // End of Activity Tab
             DashboardTab.Books -> {
                 com.daemon.expnesso.ui.dashboard.BooksTabContent(
                     allSessions = allSessions,
-                    currentSessionId = currentSessionId,
+                    defaultSessionId = defaultSessionId,
+                    allKnownUsers = allKnownUsers,
                     onSessionClick = { session ->
                         viewModel.switchSession(session.id)
                         selectedTab = DashboardTab.Activity
                     },
-                    padding = padding,
-                    allKnownUsers = allKnownUsers
+                    onSetDefaultClick = { session ->
+                        if (session.id != defaultSessionId) {
+                            viewModel.setDefaultSession(session.id)
+                            android.widget.Toast.makeText(context, "${session.name} is default selected", android.widget.Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    padding = padding
                 )
             }
             DashboardTab.SplitStats -> {
@@ -913,6 +879,58 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
                         navController.navigate(com.daemon.expnesso.navigation.Screen.BookDetails.createRoute(s.id))
                     }
                 )
+            }
+            DashboardTab.History -> {
+                val sdf = remember { SimpleDateFormat("MMM dd, yyyy", Locale.getDefault()) }
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding)
+                        .background(PremiumBackground)
+                ) {
+                    Text(
+                        text = "History",
+                        color = Color.White,
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp)
+                    )
+                    
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 16.dp),
+                        contentPadding = PaddingValues(bottom = 80.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        if (allUserTransactions.isEmpty()) {
+                            item {
+                                Text(
+                                    "No transactions yet.",
+                                    color = TextSecondary,
+                                    fontSize = 14.sp,
+                                    modifier = Modifier.padding(vertical = 16.dp)
+                                )
+                            }
+                        } else {
+                            items(allUserTransactions, key = { it.id }) { tx ->
+                                val currentSession = allSessions.find { it.id == tx.sessionId }
+                                TransactionItem(
+                                    transaction = tx,
+                                    paidBy = allKnownUsers[tx.paidByUid.ifEmpty { tx.addedByUid }],
+                                    currentUserId = viewModel.currentUserId,
+                                    adminUid = currentSession?.adminUid,
+                                    sessionName = currentSession?.name,
+                                    sessionMembers = allKnownUsers,
+                                    sdf = sdf,
+                                    onDelete = {
+                                        viewModel.deleteTransaction(tx.id, currentSession?.adminUid ?: "", tx.addedByUid)
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
             }
         } // End of when
     }

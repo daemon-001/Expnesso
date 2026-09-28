@@ -15,10 +15,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.border
 import androidx.compose.ui.graphics.Color
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.Star
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -29,9 +35,10 @@ import com.daemon.expnesso.ui.theme.*
 @Composable
 fun BooksTabContent(
     allSessions: List<Session>,
-    currentSessionId: String,
+    defaultSessionId: String?,
     allKnownUsers: Map<String, User>,
     onSessionClick: (Session) -> Unit,
+    onSetDefaultClick: (Session) -> Unit,
     padding: PaddingValues
 ) {
     Column(
@@ -62,12 +69,17 @@ fun BooksTabContent(
                 contentPadding = PaddingValues(bottom = 80.dp)
             ) {
                 items(allSessions, key = { it.id }) { session ->
-                    val isCurrent = session.id == currentSessionId
+                    val isCurrent = session.id == defaultSessionId
+                    
+                    val bgColor by animateColorAsState(if (isCurrent) PremiumSurfaceVariant else PremiumSurface, label = "bg")
+                    val borderColor by animateColorAsState(if (isCurrent) PrimaryAccent.copy(alpha = 0.5f) else Color.White.copy(alpha = 0.05f), label = "border")
+                    
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(16.dp))
-                            .background(if (isCurrent) PremiumSurfaceVariant else PremiumSurface)
+                            .background(bgColor)
+                            .border(if (isCurrent) 2.dp else 1.dp, borderColor, RoundedCornerShape(16.dp))
                             .clickable { onSessionClick(session) }
                             .padding(16.dp)
                     ) {
@@ -91,15 +103,16 @@ fun BooksTabContent(
                                     fontWeight = FontWeight.Medium
                                 )
                             }
-                            if (isCurrent) {
-                                Text(
-                                    text = "Current",
-                                    color = PrimaryAccent,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier
-                                        .background(PrimaryAccent.copy(alpha = 0.15f), RoundedCornerShape(8.dp))
-                                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                            
+                            IconButton(
+                                onClick = { onSetDefaultClick(session) },
+                                modifier = Modifier
+                                    .background(if (isCurrent) PrimaryAccent.copy(alpha = 0.15f) else Color.Transparent, androidx.compose.foundation.shape.CircleShape)
+                            ) {
+                                Icon(
+                                    imageVector = if (isCurrent) Icons.Filled.Star else Icons.Outlined.Star,
+                                    contentDescription = if (isCurrent) "Current Book" else "Set as Default",
+                                    tint = if (isCurrent) PrimaryAccent else TextSecondary
                                 )
                             }
                         }
