@@ -80,45 +80,41 @@ fun LoginScreen(navController: NavController) {
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
-            try {
-                val account = task.getResult(ApiException::class.java)
-                val credential = GoogleAuthProvider.getCredential(account.idToken, null)
-                scope.launch {
-                    try {
-                        isLoading = true
-                        val authResult = authRepository.firebaseAuth.signInWithCredential(credential).await()
-                        authResult.user?.let { firebaseUser ->
-                            val userDoc = firestoreRepository.getUser(firebaseUser.uid)
-                            if (userDoc == null) {
-                                pendingGoogleUser = firebaseUser
-                                googleName = firebaseUser.displayName ?: ""
-                                showGoogleNameDialog = true
-                                isLoading = false
-                            } else {
-                                var targetSessionId = userDoc.defaultSessionId
-                                if (targetSessionId.isNullOrEmpty()) {
-                                    targetSessionId = ""
-                                }
-                                navController.navigate(Screen.Dashboard.createRoute(targetSessionId)) {
-                                    popUpTo(Screen.Login.route) { inclusive = true }
-                                }
+        val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+        try {
+            val account = task.getResult(com.google.android.gms.common.api.ApiException::class.java)
+            val credential = GoogleAuthProvider.getCredential(account.idToken, null)
+            scope.launch {
+                try {
+                    isLoading = true
+                    val authResult = authRepository.firebaseAuth.signInWithCredential(credential).await()
+                    authResult.user?.let { firebaseUser ->
+                        val userDoc = firestoreRepository.getUser(firebaseUser.uid)
+                        if (userDoc == null) {
+                            pendingGoogleUser = firebaseUser
+                            googleName = firebaseUser.displayName ?: ""
+                            showGoogleNameDialog = true
+                            isLoading = false
+                        } else {
+                            var targetSessionId = userDoc.defaultSessionId
+                            if (targetSessionId.isNullOrEmpty()) {
+                                targetSessionId = ""
                             }
-                        } ?: run {
-                            throw Exception("Failed to get Firebase User")
+                            navController.navigate(Screen.Dashboard.createRoute(targetSessionId)) {
+                                popUpTo(Screen.Login.route) { inclusive = true }
+                            }
                         }
-                    } catch (e: Exception) {
-                        errorMessage = e.localizedMessage
-                        isLoading = false
+                    } ?: run {
+                        throw Exception("Failed to get Firebase User")
                     }
+                } catch (e: Exception) {
+                    errorMessage = e.localizedMessage
+                    isLoading = false
                 }
-            } catch (e: ApiException) {
-                Log.w("LoginScreen", "Google sign in failed", e)
-                errorMessage = "Google Sign In failed: ${e.statusCode}"
-                isLoading = false
             }
-        } else {
+        } catch (e: com.google.android.gms.common.api.ApiException) {
+            android.util.Log.w("LoginScreen", "Google sign in failed", e)
+            errorMessage = "Google Sign In failed: ${e.statusCode} (${com.google.android.gms.auth.api.signin.GoogleSignInStatusCodes.getStatusCodeString(e.statusCode)})"
             isLoading = false
         }
     }
