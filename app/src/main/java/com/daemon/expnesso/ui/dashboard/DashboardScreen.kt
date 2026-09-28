@@ -90,7 +90,7 @@ import java.text.SimpleDateFormat
 import java.util.Locale
 
 enum class DashboardTab {
-    Books, Activity, Groups, SplitStats
+    Books, Activity, SplitStats
 }
 
 @OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
@@ -899,14 +899,8 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
                         viewModel.switchSession(session.id)
                         selectedTab = DashboardTab.Activity
                     },
-                    padding = padding
-                )
-            }
-            DashboardTab.Groups -> {
-                com.daemon.expnesso.ui.dashboard.GroupsTabContent(
-                    allSessions = allSessions,
-                    allKnownUsers = allKnownUsers,
-                    padding = padding
+                    padding = padding,
+                    allKnownUsers = allKnownUsers
                 )
             }
             DashboardTab.SplitStats -> {
@@ -1192,7 +1186,7 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
                 }
             },
             containerColor = PremiumSurface
-         )
+        )
     }
 
     bookToRename?.let { book ->

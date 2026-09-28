@@ -42,9 +42,19 @@ fun DashboardBottomBar(
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Books Tab
+            // Home (Activity) Tab
             BottomBarItem(
                 icon = Icons.Default.Dashboard,
+                label = "Home",
+                isSelected = selectedTab == DashboardTab.Activity,
+                activeColor = activeColor,
+                inactiveColor = inactiveColor,
+                onClick = { onTabSelected(DashboardTab.Activity) }
+            )
+
+            // Books Tab
+            BottomBarItem(
+                icon = Icons.Default.LibraryBooks,
                 label = "Books",
                 isSelected = selectedTab == DashboardTab.Books,
                 activeColor = activeColor,
@@ -52,28 +62,10 @@ fun DashboardBottomBar(
                 onClick = { onTabSelected(DashboardTab.Books) }
             )
 
-            // Activity Tab
-            BottomBarItem(
-                icon = Icons.Default.Receipt,
-                label = "Activity",
-                isSelected = selectedTab == DashboardTab.Activity,
-                activeColor = activeColor,
-                inactiveColor = inactiveColor,
-                onClick = { onTabSelected(DashboardTab.Activity) }
-            )
-
             // Spacer for center FAB
             Spacer(modifier = Modifier.width(64.dp))
 
-            // Groups Tab
-            BottomBarItem(
-                icon = Icons.Default.People,
-                label = "Groups",
-                isSelected = selectedTab == DashboardTab.Groups,
-                activeColor = activeColor,
-                inactiveColor = inactiveColor,
-                onClick = { onTabSelected(DashboardTab.Groups) }
-            )
+            // Groups Tab has been merged into Books
 
             // Split Stats Tab
             BottomBarItem(

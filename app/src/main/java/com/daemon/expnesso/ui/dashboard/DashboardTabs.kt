@@ -30,6 +30,7 @@ import com.daemon.expnesso.ui.theme.*
 fun BooksTabContent(
     allSessions: List<Session>,
     currentSessionId: String,
+    allKnownUsers: Map<String, User>,
     onSessionClick: (Session) -> Unit,
     padding: PaddingValues
 ) {
@@ -57,16 +58,16 @@ fun BooksTabContent(
             )
         } else {
             LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
                 contentPadding = PaddingValues(bottom = 80.dp)
             ) {
                 items(allSessions, key = { it.id }) { session ->
                     val isCurrent = session.id == currentSessionId
-                    Box(
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(if (isCurrent) PrimaryAccent.copy(alpha = 0.1f) else PremiumSurfaceVariant)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(if (isCurrent) PremiumSurfaceVariant else PremiumSurface)
                             .clickable { onSessionClick(session) }
                             .padding(16.dp)
                     ) {
@@ -79,14 +80,15 @@ fun BooksTabContent(
                                 Text(
                                     text = session.name,
                                     color = if (isCurrent) PrimaryAccent else Color.White,
-                                    fontSize = 18.sp,
-                                    fontWeight = FontWeight.SemiBold
+                                    fontSize = 20.sp,
+                                    fontWeight = FontWeight.Bold
                                 )
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
                                     text = "Code: ${session.inviteCode}",
                                     color = TextSecondary,
-                                    fontSize = 14.sp
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Medium
                                 )
                             }
                             if (isCurrent) {
@@ -96,64 +98,27 @@ fun BooksTabContent(
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
                                     modifier = Modifier
-                                        .background(PrimaryAccent.copy(alpha = 0.2f), RoundedCornerShape(4.dp))
-                                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                                        .background(PrimaryAccent.copy(alpha = 0.15f), RoundedCornerShape(8.dp))
+                                        .padding(horizontal = 10.dp, vertical = 6.dp)
                                 )
                             }
                         }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun GroupsTabContent(
-    allSessions: List<Session>,
-    allKnownUsers: Map<String, User>,
-    padding: PaddingValues
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(PremiumBackground)
-            .padding(padding)
-            .padding(horizontal = 16.dp)
-    ) {
-        Text(
-            text = "Group Members",
-            color = Color.White,
-            fontSize = 24.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(vertical = 16.dp)
-        )
-        
-        if (allSessions.isEmpty()) {
-            Text(
-                text = "You haven't joined any books yet.",
-                color = TextSecondary,
-                fontSize = 16.sp,
-                modifier = Modifier.padding(vertical = 16.dp)
-            )
-        } else {
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-                contentPadding = PaddingValues(bottom = 80.dp)
-            ) {
-                items(allSessions, key = { "group_${it.id}" }) { session ->
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(PremiumSurfaceVariant)
-                            .padding(16.dp)
-                    ) {
+                        
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(1.dp)
+                                .background(Color.White.copy(alpha = 0.05f))
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        
                         Text(
-                            text = session.name,
-                            color = PrimaryAccent,
-                            fontSize = 18.sp,
+                            text = "MEMBERS",
+                            color = TextSecondary,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.sp,
                             modifier = Modifier.padding(bottom = 12.dp)
                         )
                         
@@ -161,41 +126,42 @@ fun GroupsTabContent(
                         if (members.isEmpty()) {
                             Text("Loading members...", color = TextSecondary, fontSize = 14.sp)
                         } else {
-                            members.forEach { user ->
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.padding(vertical = 4.dp)
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(32.dp)
-                                            .clip(RoundedCornerShape(16.dp))
-                                            .background(Color(0xFF6A67CE)),
-                                        contentAlignment = Alignment.Center
+                            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                members.forEach { user ->
+                                    val isAdmin = user.uid == session.adminUid
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.fillMaxWidth()
                                     ) {
-                                        Text(
-                                            text = user.name.take(1).uppercase(),
-                                            color = Color.White,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 14.sp
-                                        )
-                                    }
-                                    Spacer(modifier = Modifier.width(12.dp))
-                                    Text(
-                                        text = user.name,
-                                        color = Color.White,
-                                        fontSize = 16.sp
-                                    )
-                                    if (user.uid == session.adminUid) {
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(
-                                            text = "Admin",
-                                            color = TextSecondary,
-                                            fontSize = 12.sp,
+                                        coil.compose.AsyncImage(
+                                            model = user.photoUrl.ifEmpty { "https://ui-avatars.com/api/?name=${user.name}" },
+                                            contentDescription = "Avatar",
                                             modifier = Modifier
-                                                .background(Color.White.copy(alpha = 0.1f), RoundedCornerShape(4.dp))
-                                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                                                .size(36.dp)
+                                                .clip(androidx.compose.foundation.shape.CircleShape)
+                                                .background(PremiumSurfaceVariant),
+                                            contentScale = androidx.compose.ui.layout.ContentScale.Crop
                                         )
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = user.name,
+                                                color = Color.White,
+                                                fontSize = 15.sp,
+                                                fontWeight = FontWeight.Medium
+                                            )
+                                        }
+                                        if (isAdmin) {
+                                            Text(
+                                                text = "Admin",
+                                                color = PrimaryAccent,
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                modifier = Modifier
+                                                    .background(PrimaryAccent.copy(alpha = 0.15f), RoundedCornerShape(6.dp))
+                                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                                            )
+                                        }
                                     }
                                 }
                             }
