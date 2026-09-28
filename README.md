@@ -19,7 +19,7 @@ Expnesso is a modern Android application built with Kotlin and Jetpack Compose f
 ## 📸 Screenshots
 
 <p align="center">
-  <img src="visuals/txz.png" width="100%"/>
+  <img src="https://github.com/daemon-001/Expnesso/blob/master/visuals/thumbnail.png" width="100%"/>
 </p>
 
 ## 🛠 Tech Stack & Libraries
