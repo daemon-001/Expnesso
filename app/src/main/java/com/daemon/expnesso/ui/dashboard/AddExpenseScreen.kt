@@ -43,6 +43,7 @@ fun AddExpenseScreen(
 ) {
     val session by viewModel.session.collectAsState()
     val sessionMembers by viewModel.sessionMembers.collectAsState()
+    val sessionDebts by viewModel.sessionDebts.collectAsState()
     val currentUserId = viewModel.currentUserId
 
     val membersList = sessionMembers.values.toList()
@@ -78,7 +79,14 @@ fun AddExpenseScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Add Expense", color = Color.White, fontWeight = FontWeight.Bold) },
+                title = { 
+                    Column {
+                        Text("Add Expense", color = Color.White, fontWeight = FontWeight.Bold)
+                        if (session?.name?.isNotEmpty() == true) {
+                            Text("Book: ${session!!.name}", color = TextSecondary, fontSize = 12.sp)
+                        }
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
@@ -319,6 +327,89 @@ fun AddExpenseScreen(
                                                 }
                                             )
                                         }
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(24.dp))
+
+                            if (paidToUid.isNotBlank() && paidByUid != paidToUid) {
+                                val currentSessionId = session?.id ?: ""
+                                val currentBookDebts = sessionDebts[currentSessionId] ?: emptyList()
+                                
+                                var currentBookOwe = 0.0
+                                var currentBookGet = 0.0
+                                currentBookDebts.forEach { debt ->
+                                    if (debt.fromUid == paidByUid && debt.toUid == paidToUid) currentBookOwe += debt.amount
+                                    if (debt.fromUid == paidToUid && debt.toUid == paidByUid) currentBookGet += debt.amount
+                                }
+                                val currentBookNet = currentBookOwe - currentBookGet
+                                
+                                var totalOwe = 0.0
+                                var totalGet = 0.0
+                                sessionDebts.values.flatten().forEach { debt ->
+                                    if (debt.fromUid == paidByUid && debt.toUid == paidToUid) totalOwe += debt.amount
+                                    if (debt.fromUid == paidToUid && debt.toUid == paidByUid) totalGet += debt.amount
+                                }
+                                val totalNet = totalOwe - totalGet
+                                
+                                val payerName = membersList.find { it.uid == paidByUid }?.name ?: "You"
+                                val payeeName = membersList.find { it.uid == paidToUid }?.name ?: "Them"
+                                val shortPayerName = payerName.split(" ").first()
+                                val shortPayeeName = payeeName.split(" ").first()
+                                
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(16.dp))
+                                        .background(PremiumSurface)
+                                        .padding(16.dp)
+                                ) {
+                                    Text("Due Summary", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    
+                                    val formatAmt = { amt: Double -> "₹${com.daemon.expnesso.utils.FormatUtils.formatAmount(kotlin.math.abs(amt))}" }
+                                    
+                                    // Current Book
+                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                        Text("In '${session?.name ?: "this book"}':", color = TextSecondary, fontSize = 14.sp)
+                                        Text(
+                                            when {
+                                                currentBookNet > 0.01 -> "$shortPayerName owes ${formatAmt(currentBookNet)}"
+                                                currentBookNet < -0.01 -> "$shortPayeeName owes ${formatAmt(currentBookNet)}"
+                                                else -> "Settled"
+                                            },
+                                            color = when {
+                                                currentBookNet > 0.01 -> ErrorRed
+                                                currentBookNet < -0.01 -> Color(0xFF4CAF50)
+                                                else -> TextSecondary
+                                            },
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                    
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    HorizontalDivider(color = PremiumSurfaceVariant)
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    
+                                    // All Books
+                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                        Text("Total across all books:", color = TextSecondary, fontSize = 14.sp)
+                                        Text(
+                                            when {
+                                                totalNet > 0.01 -> "$shortPayerName owes ${formatAmt(totalNet)}"
+                                                totalNet < -0.01 -> "$shortPayeeName owes ${formatAmt(totalNet)}"
+                                                else -> "Settled"
+                                            },
+                                            color = when {
+                                                totalNet > 0.01 -> ErrorRed
+                                                totalNet < -0.01 -> Color(0xFF4CAF50)
+                                                else -> TextSecondary
+                                            },
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
                                     }
                                 }
                             }
