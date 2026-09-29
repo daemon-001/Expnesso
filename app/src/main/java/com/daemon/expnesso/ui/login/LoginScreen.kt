@@ -20,6 +20,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.painterResource
@@ -31,6 +36,10 @@ import com.daemon.expnesso.navigation.Screen
 import com.daemon.expnesso.ui.theme.PrimaryAccent
 import com.daemon.expnesso.ui.theme.PremiumBackground
 import com.daemon.expnesso.ui.theme.SecondaryAccent
+import com.daemon.expnesso.ui.theme.PremiumSurface
+import com.daemon.expnesso.ui.theme.PremiumSurfaceVariant
+import com.daemon.expnesso.ui.theme.TextPrimary
+import com.daemon.expnesso.ui.theme.TextSecondary
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.common.api.ApiException
 import com.google.firebase.auth.FirebaseUser
@@ -120,56 +129,107 @@ fun LoginScreen(navController: NavController) {
     }
 
     if (showGoogleNameDialog && pendingGoogleUser != null) {
-        AlertDialog(
+        androidx.compose.ui.window.Dialog(
             onDismissRequest = { /* Require name */ },
-            title = { Text("Welcome to Expnesso!") },
-            text = {
-                Column {
-                    Text("Please enter your name to continue:")
+            properties = androidx.compose.ui.window.DialogProperties(
+                dismissOnBackPress = false,
+                dismissOnClickOutside = false
+            )
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(32.dp))
+                    .background(Brush.linearGradient(colors = listOf(PremiumSurfaceVariant, PremiumSurface)))
+                    .padding(32.dp)
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Person,
+                        contentDescription = null,
+                        tint = PrimaryAccent,
+                        modifier = Modifier
+                            .size(64.dp)
+                            .background(PrimaryAccent.copy(alpha = 0.1f), CircleShape)
+                            .padding(16.dp)
+                    )
+                    Spacer(modifier = Modifier.height(24.dp))
+                    Text(
+                        text = "Welcome to Expnesso!",
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimary
+                    )
                     Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "How should we call you?",
+                        fontSize = 14.sp,
+                        color = TextSecondary
+                    )
+                    Spacer(modifier = Modifier.height(24.dp))
+                    
                     OutlinedTextField(
                         value = googleName,
                         onValueChange = { googleName = it },
-                        label = { Text("Name") },
+                        label = { Text("Display Name", color = TextSecondary) },
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = PrimaryAccent,
+                            unfocusedBorderColor = PremiumSurfaceVariant,
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary,
+                            cursorColor = PrimaryAccent
+                        ),
+                        keyboardOptions = KeyboardOptions(
+                            capitalization = KeyboardCapitalization.Words,
+                            imeAction = ImeAction.Done
+                        )
                     )
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        if (googleName.isNotBlank()) {
-                            scope.launch {
-                                isLoading = true
-                                showGoogleNameDialog = false
-                                try {
-                                    val profileUpdates = UserProfileChangeRequest.Builder()
-                                        .setDisplayName(googleName)
-                                        .build()
-                                    pendingGoogleUser!!.updateProfile(profileUpdates).await()
-                                    firestoreRepository.saveUser(pendingGoogleUser!!, googleName)
-                                    
-                                    val userDoc = firestoreRepository.getUser(pendingGoogleUser!!.uid)
-                                    var targetSessionId = userDoc?.defaultSessionId
-                                    if (targetSessionId.isNullOrEmpty()) {
-                                        targetSessionId = ""
+                    
+                    Spacer(modifier = Modifier.height(32.dp))
+                    
+                    Button(
+                        onClick = {
+                            if (googleName.isNotBlank()) {
+                                scope.launch {
+                                    isLoading = true
+                                    showGoogleNameDialog = false
+                                    try {
+                                        val profileUpdates = UserProfileChangeRequest.Builder()
+                                            .setDisplayName(googleName)
+                                            .build()
+                                        pendingGoogleUser!!.updateProfile(profileUpdates).await()
+                                        firestoreRepository.saveUser(pendingGoogleUser!!, googleName)
+                                        
+                                        val userDoc = firestoreRepository.getUser(pendingGoogleUser!!.uid)
+                                        var targetSessionId = userDoc?.defaultSessionId
+                                        if (targetSessionId.isNullOrEmpty()) {
+                                            targetSessionId = ""
+                                        }
+                                        navController.navigate(Screen.Dashboard.createRoute(targetSessionId)) {
+                                            popUpTo(Screen.Login.route) { inclusive = true }
+                                        }
+                                    } catch (e: Exception) {
+                                        errorMessage = e.localizedMessage
+                                        isLoading = false
                                     }
-                                    navController.navigate(Screen.Dashboard.createRoute(targetSessionId)) {
-                                        popUpTo(Screen.Login.route) { inclusive = true }
-                                    }
-                                } catch (e: Exception) {
-                                    errorMessage = e.localizedMessage
-                                    isLoading = false
                                 }
                             }
-                        }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryAccent),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Text("Get Started", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                     }
-                ) {
-                    Text("Save")
                 }
             }
-        )
+        }
     }
 
     Box(

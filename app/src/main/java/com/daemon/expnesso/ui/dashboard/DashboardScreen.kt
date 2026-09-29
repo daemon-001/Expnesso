@@ -446,19 +446,45 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
                 val targetSession = session
                 if (targetSession == null) {
                     if (isSessionsLoaded && allSessions.isEmpty() && currentSessionId.isBlank()) {
+                        val firstName = currentUser?.name?.split(" ")?.firstOrNull() ?: "there"
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(24.dp))
                                 .background(Brush.linearGradient(colors = listOf(PremiumSurfaceVariant, PremiumSurface)))
-                                .padding(32.dp),
+                                .padding(24.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Icon(Icons.Default.Star, contentDescription = null, tint = PrimaryAccent, modifier = Modifier.size(48.dp))
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Text("Welcome to Expnesso!", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text("Create or join a book to start tracking expenses.", color = TextSecondary, fontSize = 14.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                            Text("Welcome, $firstName! \uD83D\uDC4B", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text("Create or join a book to start tracking expenses with your friends.", color = TextSecondary, fontSize = 14.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                            Spacer(modifier = Modifier.height(24.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                Button(
+                                    onClick = { showCreateBookDialog = true },
+                                    modifier = Modifier.weight(1f).height(48.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryAccent),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Icon(Icons.Default.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Create", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                }
+                                Button(
+                                    onClick = { showJoinBookDialog = true },
+                                    modifier = Modifier.weight(1f).height(48.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = PremiumSurface),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, PrimaryAccent.copy(alpha = 0.5f)),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Icon(Icons.Default.Search, contentDescription = null, tint = PrimaryAccent, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Join", color = PrimaryAccent, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                }
+                            }
                         }
                     } else {
                         Column(modifier = Modifier.background(PremiumBackground)) {
@@ -665,16 +691,18 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
                     val targetSession = session
 
                     if (targetSession == null) {
-                        Row(modifier = Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Box(modifier = Modifier.width(80.dp).height(24.dp).shimmerEffect())
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Box(modifier = Modifier.fillMaxWidth().height(60.dp).clip(RoundedCornerShape(12.dp)).shimmerEffect())
-                            }
-                            Column(modifier = Modifier.weight(1f)) {
-                                Box(modifier = Modifier.width(80.dp).height(24.dp).shimmerEffect())
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Box(modifier = Modifier.fillMaxWidth().height(60.dp).clip(RoundedCornerShape(12.dp)).shimmerEffect())
+                        if (!(isSessionsLoaded && allSessions.isEmpty() && currentSessionId.isBlank())) {
+                            Row(modifier = Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Box(modifier = Modifier.width(80.dp).height(24.dp).shimmerEffect())
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Box(modifier = Modifier.fillMaxWidth().height(60.dp).clip(RoundedCornerShape(12.dp)).shimmerEffect())
+                                }
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Box(modifier = Modifier.width(80.dp).height(24.dp).shimmerEffect())
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Box(modifier = Modifier.fillMaxWidth().height(60.dp).clip(RoundedCornerShape(12.dp)).shimmerEffect())
+                                }
                             }
                         }
                     } else {
