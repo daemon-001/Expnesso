@@ -349,64 +349,10 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
         
         when (selectedTab) {
             DashboardTab.Activity -> {
-                val headerState = remember { androidx.compose.animation.core.MutableTransitionState(true) }
-                var isConsumingCurrentGesture by remember { mutableStateOf(false) }
-
-                val nestedScrollConnection = remember {
-                    object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
-                override fun onPreScroll(available: androidx.compose.ui.geometry.Offset, source: androidx.compose.ui.input.nestedscroll.NestedScrollSource): androidx.compose.ui.geometry.Offset {
-                    if (available.y < 0) {
-                        if (headerState.targetState) {
-                            headerState.targetState = false
-                            isConsumingCurrentGesture = true
-                        }
-                        if (isConsumingCurrentGesture) {
-                            return androidx.compose.ui.geometry.Offset(0f, available.y)
-                        }
-                    } else if (available.y > 0) {
-                        if (isConsumingCurrentGesture) {
-                            return androidx.compose.ui.geometry.Offset(0f, available.y)
-                        }
-                    }
-                    return androidx.compose.ui.geometry.Offset.Zero
-                }
-
-                override fun onPostScroll(
-                    consumed: androidx.compose.ui.geometry.Offset,
-                    available: androidx.compose.ui.geometry.Offset,
-                    source: androidx.compose.ui.input.nestedscroll.NestedScrollSource
-                ): androidx.compose.ui.geometry.Offset {
-                    if (available.y > 0) {
-                        if (!headerState.targetState) {
-                            headerState.targetState = true
-                            isConsumingCurrentGesture = true
-                        }
-                        if (isConsumingCurrentGesture) {
-                            return androidx.compose.ui.geometry.Offset(0f, available.y)
-                        }
-                    }
-                    return androidx.compose.ui.geometry.Offset.Zero
-                }
-
-                override suspend fun onPreFling(available: androidx.compose.ui.unit.Velocity): androidx.compose.ui.unit.Velocity {
-                    if (isConsumingCurrentGesture) {
-                        isConsumingCurrentGesture = false
-                        return available
-                    }
-                    return androidx.compose.ui.unit.Velocity.Zero
-                }
-            }
-        }
-
-        LaunchedEffect(session?.id) {
-            headerState.targetState = true
-        }
-
         Column(
             modifier = Modifier
                 .padding(padding)
                 .fillMaxSize()
-                .nestedScroll(nestedScrollConnection)
         ) {
 
             var globalTotalExpense = 0.0
@@ -424,21 +370,7 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
                 }
             }
 
-            androidx.compose.animation.AnimatedVisibility(
-                visible = headerState.targetState,
-                enter = androidx.compose.animation.expandVertically(
-                    animationSpec = androidx.compose.animation.core.spring(
-                        dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy,
-                        stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow
-                    )
-                ),
-                exit = androidx.compose.animation.shrinkVertically(
-                    animationSpec = androidx.compose.animation.core.spring(
-                        dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy,
-                        stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow
-                    )
-                )
-            ) {
+            Box {
                 Column {
                     Row(
                         modifier = Modifier
@@ -728,13 +660,6 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
             // Collapsible Mid Section
             Column(modifier = Modifier
                     .padding(horizontal = 16.dp)
-                    .pointerInput(Unit) {
-                        detectVerticalDragGestures { _, dragAmount ->
-                            if (dragAmount < -5f) { // Swiped up
-                                headerState.targetState = false
-                            }
-                        }
-                    }
                 ) {
                     Spacer(modifier = Modifier.height(12.dp))
                     val targetSession = session
@@ -866,6 +791,8 @@ fun DashboardScreen(navController: NavController, viewModel: DashboardViewModel)
                             android.widget.Toast.makeText(context, "${session.name} is default selected", android.widget.Toast.LENGTH_SHORT).show()
                         }
                     },
+                    onCreateBookClick = { showCreateBookDialog = true },
+                    onJoinBookClick = { showJoinBookDialog = true },
                     padding = padding
                 )
             }
