@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.0.3 (10031)
+September 30, 2026
+
+### Bug Fixes & Optimizations
+- **Release Mode Crashes Fixed**: 
+  - Fixed Google Sign-In `10 (DEVELOPER_ERROR)` by preserving the Web Client ID string from the resource shrinker.
+  - Fixed Firestore crash (`Could not deserialize object`) by ensuring model classes are retained during R8 obfuscation.
+  - Fixed ML Kit Code Scanner `NullPointerException` during Dashboard initialization by keeping internal package boundaries safe from aggressive R8 optimizations.
+
 ## v1.0.2 (10021)
 September 30, 2026
 
