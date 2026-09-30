@@ -37,3 +37,6 @@
 
 # Keep Firestore data models to avoid deserialization crashes
 -keep class com.daemon.expnesso.data.model.** { *; }
+# Keep Firebase Auth and Google Sign In safe
+-keep class com.google.android.gms.auth.** { *; }
+-keep class com.google.firebase.auth.** { *; }
