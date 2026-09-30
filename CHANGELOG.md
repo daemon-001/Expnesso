@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.0.2 (10021)
+September 30, 2026
+
+### Key Improvements & Polish
+- **Dashboard & Books**: Polished empty dashboard state with onboarding actions, added quick "Create Book" and "Join Book" buttons in the Books tab, and streamlined header layout.
+- **Google Sign-In & Onboarding**: Enhanced Google sign-in failure diagnostics with status code details and added a styled Google user name prompt dialog.
+- **Build & Optimization**: Enabled release code shrinking and resource minification, and updated Android Gradle Plugin.
+
 ## v1.0.1 (10011)
 September 28, 2026
 

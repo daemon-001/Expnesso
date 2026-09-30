@@ -14,8 +14,8 @@ android {
         applicationId = "com.daemon.expnesso"
         minSdk = 28
         targetSdk = 36
-        versionCode = 10011
-        versionName = "1.0.1"
+        versionCode = 10021
+        versionName = "1.0.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
