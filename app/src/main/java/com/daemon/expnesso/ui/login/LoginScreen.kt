@@ -89,6 +89,11 @@ fun LoginScreen(navController: NavController) {
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
+        if (result.data == null) {
+            isLoading = false
+            errorMessage = "Google Sign-In was cancelled or failed to launch."
+            return@rememberLauncherForActivityResult
+        }
         val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
         try {
             val account = task.getResult(com.google.android.gms.common.api.ApiException::class.java)
@@ -398,8 +403,10 @@ fun LoginScreen(navController: NavController) {
                     onClick = {
                         isLoading = true
                         errorMessage = null
-                        val intent = authRepository.getGoogleSignInClient().signInIntent
-                        launcher.launch(intent)
+                        val googleClient = authRepository.getGoogleSignInClient()
+                        googleClient.signOut().addOnCompleteListener {
+                            launcher.launch(googleClient.signInIntent)
+                        }
                     },
                     modifier = Modifier
                         .fillMaxWidth()
@@ -432,3 +439,4 @@ fun LoginScreen(navController: NavController) {
         }
     }
 }
+
